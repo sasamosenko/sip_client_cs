@@ -18,4 +18,52 @@ public partial class MainWindow : Window
             vm.Password = PasswordBox.Password;
         }
     }
+
+    private void PasswordToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (PasswordToggle.IsChecked == true)
+        {
+            // Show password as plain text
+            var pwd = PasswordBox.Password;
+            PasswordBox.Visibility = Visibility.Collapsed;
+
+            var tb = new TextBox
+            {
+                Text = pwd,
+                Padding = new Thickness(12, 10, 12, 10),
+                FontSize = 14,
+                Background = (System.Windows.Media.Brush)FindResource("SurfaceCardBrush"),
+                Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush"),
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x58, 0x58, 0x78)),
+                BorderThickness = new Thickness(1),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Tag = "PasswordBoxReplacement"
+            };
+            tb.TextChanged += (s, args) =>
+            {
+                if (DataContext is ViewModels.MainViewModel vm2)
+                    vm2.Password = tb.Text;
+            };
+
+            var grid = (Grid)PasswordBox.Parent;
+            grid.Children.Add(tb);
+            Grid.SetColumn(tb, 0);
+        }
+        else
+        {
+            // Hide password, restore PasswordBox
+            var grid = (Grid)PasswordBox.Parent;
+            var tb = grid.Children
+                .OfType<Control>()
+                .FirstOrDefault(c => c.Tag?.ToString() == "PasswordBoxReplacement") as TextBox;
+
+            if (tb != null)
+            {
+                PasswordBox.Password = tb.Text;
+                grid.Children.Remove(tb);
+            }
+
+            PasswordBox.Visibility = Visibility.Visible;
+        }
+    }
 }
