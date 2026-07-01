@@ -1,0 +1,11 @@
+<Application x:Class="SipClient.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        
+        <local:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVisibility"
+            xmlns:local="clr-namespace:SipClient"/>
+    </Application.Resources>
+</Application>

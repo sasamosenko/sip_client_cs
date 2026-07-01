@@ -1,0 +1,12 @@
+{
+  "Server": "",
+  "Port": 5060,
+  "Username": "",
+  "Password": "",
+  "CaptureDeviceId": -1,
+  "PlaybackDeviceId": -1,
+  "MicVolume": 80,
+  "SpeakerVolume": 80,
+  "AutoAnswerEnabled": false,
+  "AutoAnswerDelaySeconds": 3
+}
