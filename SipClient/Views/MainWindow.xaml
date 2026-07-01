@@ -2,15 +2,16 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:SipClient.ViewModels"
-        Title="SIP Client" Height="750" Width="460"
+        Title="SIP Client" Height="800" Width="520"
+        MinHeight="600" MinWidth="440"
         WindowStartupLocation="CenterScreen"
         Background="#1A1A2E"
-        ResizeMode="CanMinimize">
-    
+        ResizeMode="CanResizeWithGrip">
+
     <Window.DataContext>
         <vm:MainViewModel />
     </Window.DataContext>
-    
+
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <local:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVis"
@@ -26,19 +27,19 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="#16213E" Padding="20,18">
+        <Border Grid.Row="0" Background="#16213E" Padding="20,16">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="SIP Client" FontSize="22" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="SIP Client" FontSize="20" FontWeight="Bold" Foreground="White"/>
                     <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{Binding StatusBrush}"
-                               Margin="0,4,0,0"/>
+                               Margin="0,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
-                <Border Grid.Column="1" Width="14" Height="14" CornerRadius="7"
-                        Background="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                <Border Grid.Column="1" Width="12" Height="12" CornerRadius="6"
+                        Background="{Binding StatusBrush}" VerticalAlignment="Top" Margin="0,4,0,0"/>
             </Grid>
         </Border>
 
@@ -46,92 +47,87 @@
         <Border Grid.Row="1" Background="#0F3460" Padding="20,16">
             <StackPanel>
                 <!-- Number Display -->
-                <Border Background="#1A1A2E" CornerRadius="12" Padding="16,12" Margin="0,0,0,16">
+                <Border Background="#1A1A2E" CornerRadius="12" Padding="16,14" Margin="0,0,0,14">
                     <Grid>
-                        <TextBlock Text="{Binding PhoneNumber}" FontSize="32" FontWeight="Light"
+                        <TextBlock Text="{Binding PhoneNumber}" FontSize="28" FontWeight="Light"
                                    Foreground="White" HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="Введите номер" FontSize="14"
-                                   Foreground="#555570" HorizontalAlignment="Center"
+                                   Foreground="{StaticResource PlaceholderBrush}" HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
                                    Visibility="{Binding PhoneNumber, Converter={StaticResource StringToEmptyVis}}"/>
                     </Grid>
                 </Border>
 
                 <!-- Quick Actions -->
-                <Grid Margin="0,0,0,12">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Button Grid.Column="0" Content="Вызов" Command="{Binding CallCommand}"
-                            Style="{StaticResource SuccessButton}" Margin="0,0,6,0" Height="42"/>
+                            Style="{StaticResource SuccessButton}" Margin="0,0,6,0"/>
                     <Button Grid.Column="1" Content="Ответить" Command="{Binding AnswerCommand}"
-                            Style="{StaticResource PrimaryButton}" Margin="3,0,3,0" Height="42"
+                            Style="{StaticResource PrimaryButton}" Margin="3,0,3,0"
                             Visibility="{Binding IsIncomingCall, Converter={StaticResource BoolToVis}}"/>
                     <Button Grid.Column="1" Content="Сброс" Command="{Binding HangupCommand}"
-                            Style="{StaticResource DangerButton}" Margin="3,0,3,0" Height="42"
+                            Style="{StaticResource DangerButton}" Margin="3,0,3,0"
                             Visibility="{Binding IsInCall, Converter={StaticResource BoolToVis}}"/>
                     <Button Grid.Column="2" Content="Настройки" Command="{Binding ToggleSettingsCommand}"
-                            Style="{StaticResource GhostButton}" Margin="6,0,0,0" Height="42"/>
+                            Style="{StaticResource GhostButton}" Margin="6,0,0,0"/>
                 </Grid>
             </StackPanel>
         </Border>
 
         <!-- Main Content -->
         <Grid Grid.Row="2" Margin="16,12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
             <!-- Active Call Panel -->
-            <Border Grid.Row="0" Style="{StaticResource CardBorder}"
+            <Border Style="{StaticResource CardBorder}"
                     Visibility="{Binding IsInCall, Converter={StaticResource BoolToVis}}">
                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                    <TextBlock Text="Активный звонок" FontSize="16" Foreground="{StaticResource TextSecondaryBrush}"
+                    <TextBlock Text="Активный звонок" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"
                                HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                    <TextBlock Text="{Binding ActiveCallNumber}" FontSize="24" FontWeight="SemiBold"
+                    <TextBlock Text="{Binding ActiveCallNumber}" FontSize="22" FontWeight="SemiBold"
                                Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <TextBlock Text="{Binding CallDuration}" FontSize="40" FontWeight="Light"
+                    <TextBlock Text="{Binding CallDuration}" FontSize="36" FontWeight="Light"
                                Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"
                                Margin="0,0,0,24"/>
 
                     <!-- Mic Volume -->
-                    <Grid Margin="0,0,0,12" Width="280">
+                    <Grid Margin="0,0,0,8" Width="300">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36"/>
+                            <ColumnDefinition Width="40"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="36"/>
+                            <ColumnDefinition Width="44"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Mic" FontSize="11" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="0" Text="Mic" FontSize="12" VerticalAlignment="Center"
                                    HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
                         <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
-                                Value="{Binding MicVolume, Mode=TwoWay}" Margin="8,0"/>
+                                Value="{Binding MicVolume, Mode=TwoWay}" Margin="4,0"/>
                         <TextBlock Grid.Column="2" Text="{Binding MicVolume, StringFormat={}{0}%}"
                                    FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Grid>
 
                     <!-- Speaker Volume -->
-                    <Grid Margin="0,0,0,24" Width="280">
+                    <Grid Margin="0,0,0,20" Width="300">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36"/>
+                            <ColumnDefinition Width="40"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="36"/>
+                            <ColumnDefinition Width="44"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Spk" FontSize="11" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="0" Text="Spk" FontSize="12" VerticalAlignment="Center"
                                    HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
                         <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
-                                Value="{Binding SpeakerVolume, Mode=TwoWay}" Margin="8,0"/>
+                                Value="{Binding SpeakerVolume, Mode=TwoWay}" Margin="4,0"/>
                         <TextBlock Grid.Column="2" Text="{Binding SpeakerVolume, StringFormat={}{0}%}"
                                    FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Grid>
 
                     <!-- Mute + Transfer + Hangup -->
-                    <Grid Width="280">
+                    <Grid Width="300">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="8"/>
@@ -140,19 +136,19 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Mute" Command="{Binding ToggleMuteCommand}"
-                                Style="{StaticResource GhostButton}" Height="44"/>
+                                Style="{StaticResource GhostButton}"/>
                         <Button Grid.Column="2" Content="Transfer" Command="{Binding OpenTransferDialogCommand}"
-                                Style="{StaticResource GhostButton}" Height="44"/>
+                                Style="{StaticResource GhostButton}"/>
                         <Button Grid.Column="4" Content="Завершить" Command="{Binding HangupCommand}"
-                                Style="{StaticResource DangerButton}" Height="44"/>
+                                Style="{StaticResource DangerButton}"/>
                     </Grid>
                 </StackPanel>
             </Border>
 
             <!-- Call History / Settings -->
-            <Grid Grid.Row="0" Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
+            <Grid Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
                 <!-- Settings Panel (overlay) -->
-                <Border Grid.Row="0" Style="{StaticResource CardBorder}"
+                <Border Style="{StaticResource CardBorder}"
                         Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}"
                         Background="#1A1A2E" Panel.ZIndex="10">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -160,129 +156,115 @@
                             <Grid>
                                 <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold"
                                            Foreground="White" VerticalAlignment="Center"/>
-                                <Button Content="✕" HorizontalAlignment="Right"
+                                <Button Content="Закрыть" HorizontalAlignment="Right"
                                         Command="{Binding ToggleSettingsCommand}"
-                                        Style="{StaticResource GhostButton}" FontSize="16"/>
+                                        Style="{StaticResource GhostButton}"/>
                             </Grid>
 
-                            <TextBlock Text="SIP Аккаунт" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,16,0,8"/>
+                            <!-- SIP Account -->
+                            <TextBlock Text="SIP Аккаунт" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Сервер" Style="{StaticResource FieldLabel}"/>
                             <TextBox Text="{Binding Server, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
-                                     Tag="Сервер (напр. main.infinity.web-zaim.ru)"/>
+                                     Tag="main.infinity.web-zaim.ru"/>
+                            <TextBlock Text="Порт" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Порт"/>
+                                     Style="{StaticResource ModernTextBox}" Tag="5060"/>
+                            <TextBlock Text="Домен (SIP realm)" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Домен (SIP realm, если отличается от сервера)"/>
+                                     Style="{StaticResource ModernTextBox}"
+                                     Tag="domain.server.com (если отличается от сервера)"/>
+                            <TextBlock Text="Логин" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Логин (SIP username)"/>
+                                     Style="{StaticResource ModernTextBox}" Tag="SIP username"/>
+                            <TextBlock Text="Auth логин" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding AuthUsername, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Auth логин (если отличается от SIP)"/>
-                            <PasswordBox x:Name="PasswordBox" Margin="0,8,0,0"
-                                         Padding="12,10" FontSize="14"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Tag="Если отличается от логина"/>
+                            <TextBlock Text="Пароль" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
+                            <PasswordBox x:Name="PasswordBox"
+                                         Padding="12,12" FontSize="14" Height="42"
                                          Background="{StaticResource SurfaceCardBrush}"
                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                         BorderBrush="Transparent" BorderThickness="2"/>
+                                         BorderBrush="#505068" BorderThickness="1"
+                                         VerticalContentAlignment="Center"/>
+                            <TextBlock Text="Отображаемое имя" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Отображаемое имя (From header)"/>
+                                     Style="{StaticResource ModernTextBox}" Tag="From header"/>
+                            <TextBlock Text="User-Agent" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding UserAgent, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="User-Agent строка"/>
+                                     Style="{StaticResource ModernTextBox}" Tag="SipClient/1.0"/>
 
-                            <TextBlock Text="Аудиоустройства" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
-                            <TextBlock Text="Микрофон" Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="12" Margin="0,0,0,4"/>
+                            <!-- Audio Devices -->
+                            <TextBlock Text="Аудиоустройства" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Микрофон" Style="{StaticResource FieldLabel}"/>
                             <ComboBox ItemsSource="{Binding CaptureDevices}"
                                       SelectedItem="{Binding SelectedCaptureDevice}"
                                       DisplayMemberPath="Name"
-                                      Padding="12,8" FontSize="14"
+                                      Padding="12,10" FontSize="14" Height="42"
                                       Background="{StaticResource SurfaceCardBrush}"
                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="Transparent" BorderThickness="2"/>
-                            <TextBlock Text="Динамик" Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontSize="12" Margin="0,8,0,4"/>
+                                      BorderBrush="#505068" BorderThickness="1"
+                                      VerticalContentAlignment="Center"/>
+                            <TextBlock Text="Динамик" Style="{StaticResource FieldLabel}" Margin="0,10,0,6"/>
                             <ComboBox ItemsSource="{Binding PlaybackDevices}"
                                       SelectedItem="{Binding SelectedPlaybackDevice}"
                                       DisplayMemberPath="Name"
-                                      Padding="12,8" FontSize="14"
+                                      Padding="12,10" FontSize="14" Height="42"
                                       Background="{StaticResource SurfaceCardBrush}"
                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="Transparent" BorderThickness="2"/>
+                                      BorderBrush="#505068" BorderThickness="1"
+                                      VerticalContentAlignment="Center"/>
 
-                            <TextBlock Text="Автоответ" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
+                            <!-- Auto Answer -->
+                            <TextBlock Text="Автоответ" Style="{StaticResource SectionHeader}"/>
                             <CheckBox Content="Включить автоответ"
                                       IsChecked="{Binding AutoAnswerEnabled}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"/>
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="70"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Задержка (сек):"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="1" Text="{Binding AutoAnswerDelay}"
-                                         Style="{StaticResource ModernTextBox}"/>
-                            </Grid>
+                                      Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                            <TextBlock Text="Задержка (сек)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding AutoAnswerDelay}"
+                                     Style="{StaticResource ModernTextBox}" Tag="3"/>
 
-                            <TextBlock Text="Регистрация" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
+                            <!-- Registration -->
+                            <TextBlock Text="Регистрация" Style="{StaticResource SectionHeader}"/>
+                            <TextBlock Text="Период перерегистрации (сек)" Style="{StaticResource FieldLabel}"/>
+                            <TextBox Text="{Binding RegistrationExpiry}"
+                                     Style="{StaticResource ModernTextBox}" Tag="600"/>
+
+                            <!-- RTP Ports -->
+                            <TextBlock Text="RTP порты (медиа)" Style="{StaticResource SectionHeader}"/>
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="70"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Период перерегистрации (сек):"
-                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                           VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="1" Text="{Binding RegistrationExpiry}"
-                                         Style="{StaticResource ModernTextBox}"/>
-                            </Grid>
-
-                            <TextBlock Text="RTP порты (медиа)" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
-                            <Grid Margin="0,0,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="12"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="От:" Foreground="{StaticResource TextSecondaryBrush}"
-                                               FontSize="12" Margin="0,0,0,4"/>
+                                    <TextBlock Text="От" Style="{StaticResource FieldLabel}"/>
                                     <TextBox Text="{Binding RtpPortMin}"
-                                             Style="{StaticResource ModernTextBox}"/>
+                                             Style="{StaticResource ModernTextBox}" Tag="10000"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="До:" Foreground="{StaticResource TextSecondaryBrush}"
-                                               FontSize="12" Margin="0,0,0,4"/>
+                                    <TextBlock Text="До" Style="{StaticResource FieldLabel}"/>
                                     <TextBox Text="{Binding RtpPortMax}"
-                                             Style="{StaticResource ModernTextBox}"/>
+                                             Style="{StaticResource ModernTextBox}" Tag="20000"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Button Content="Сохранить" Command="{Binding SaveSettingsCommand}"
-                                    Style="{StaticResource PrimaryButton}" Margin="0,20,0,0"
+                            <Button Content="Сохранить настройки" Command="{Binding SaveSettingsCommand}"
+                                    Style="{StaticResource PrimaryButton}" Margin="0,20,0,8"
                                     HorizontalAlignment="Stretch"/>
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
 
                 <!-- Call History -->
-                <Border Grid.Row="0" Style="{StaticResource CardBorder}"
+                <Border Style="{StaticResource CardBorder}"
                         Visibility="{Binding ShowSettings, Converter={StaticResource InvertedBoolToVis}}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Text="История звонков" FontSize="18" FontWeight="SemiBold"
@@ -304,29 +286,24 @@
                                             <RowDefinition/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Direction Icon -->
                                         <Border Grid.Column="0" Grid.RowSpan="2" Width="40" Height="40"
                                                 CornerRadius="20" HorizontalAlignment="Center"
                                                 VerticalAlignment="Center" Margin="0,0,10,0">
                                             <Border.Background>
                                                 <SolidColorBrush Color="{Binding DirectionColor}"/>
                                             </Border.Background>
-                                            <TextBlock Text="{Binding DirectionIcon}" FontSize="16"
+                                            <TextBlock Text="{Binding DirectionIcon}" FontSize="12" FontWeight="Bold"
                                                        Foreground="White" HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
                                         </Border>
 
-                                        <!-- Number -->
                                         <TextBlock Grid.Column="1" Grid.Row="0"
                                                    Text="{Binding Number}" FontSize="14" FontWeight="SemiBold"
                                                    Foreground="{StaticResource TextPrimaryBrush}"/>
-
-                                        <!-- Time -->
                                         <TextBlock Grid.Column="1" Grid.Row="1"
                                                    Text="{Binding TimeDisplay}" FontSize="12"
                                                    Foreground="{StaticResource TextSecondaryBrush}"/>
 
-                                        <!-- Duration -->
                                         <StackPanel Grid.Column="2" Grid.RowSpan="2"
                                                     VerticalAlignment="Center" HorizontalAlignment="Right">
                                             <TextBlock Text="{Binding DurationStr}" FontSize="13"
@@ -354,12 +331,11 @@
         <Border Grid.Row="0" Grid.RowSpan="4" Background="#CC000000" Panel.ZIndex="100"
                 Visibility="{Binding ShowTransferDialog, Converter={StaticResource BoolToVis}}">
             <Border Style="{StaticResource CardBorder}" VerticalAlignment="Center"
-                    HorizontalAlignment="Center" Width="320" Margin="20">
+                    HorizontalAlignment="Center" MinWidth="340" Margin="20">
                 <StackPanel>
                     <TextBlock Text="Blind Transfer" FontSize="18" FontWeight="SemiBold"
                                Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16"/>
-                    <TextBlock Text="Номер абонента:" FontSize="12"
-                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
+                    <TextBlock Text="Номер абонента" Style="{StaticResource FieldLabel}"/>
                     <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource ModernTextBox}"/>
                     <Grid Margin="0,16,0,0">
@@ -370,10 +346,10 @@
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Отмена"
                                 Command="{Binding CancelTransferCommand}"
-                                Style="{StaticResource GhostButton}" Height="40"/>
+                                Style="{StaticResource GhostButton}"/>
                         <Button Grid.Column="2" Content="Перевести"
                                 Command="{Binding ExecuteTransferCommand}"
-                                Style="{StaticResource PrimaryButton}" Height="40"/>
+                                Style="{StaticResource PrimaryButton}"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -383,7 +359,7 @@
         <Border Grid.Row="3" Padding="16,12" Background="#16213E"
                 Visibility="{Binding IsRegistered, Converter={StaticResource InvertedBoolToVis}}">
             <Button Content="Подключиться" Command="{Binding ConnectCommand}"
-                    Style="{StaticResource PrimaryButton}" Height="44"
+                    Style="{StaticResource PrimaryButton}"
                     HorizontalAlignment="Stretch"/>
         </Border>
     </Grid>
