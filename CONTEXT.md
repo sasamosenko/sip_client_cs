@@ -22,7 +22,7 @@ SIP-слой полностью переписан под SIPSorcery 6.x API. П
 - `Resources/phone.ico` — удалена невалидная заглушка
 
 ## Структура проекта
-```
+```pf
 sip_client_cs/
 ├── SipClient/
 │   ├── SipClient.csproj        # .NET 8, SIPSorcery 6.0.2, CommunityToolkit.Mvvm
