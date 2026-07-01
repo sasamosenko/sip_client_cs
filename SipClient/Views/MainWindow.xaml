@@ -150,7 +150,7 @@
                 <!-- Settings Panel (overlay) -->
                 <Border Grid.Row="0" Style="{StaticResource CardBorder}"
                         Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}"
-                        Background="#1A1A2E" ZIndex="10">
+                        Background="#1A1A2E" Panel.ZIndex="10">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel>
                             <Grid>
