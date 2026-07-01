@@ -8,28 +8,29 @@
 - **C# версия (активная):** `https://github.com/sasamosenko/sip_client_cs` — .NET 8 + WPF + SIPSorcery
 
 ## Где работаем
-- Разработка на **macOS** (нет dotnet CLI, нет Visual Studio)
-- Сборка на **Windows** через GitHub Actions
-- Код пишем здесь, ошибки ловим через GitHub Actions build logs
+- Разработка на **Windows** (dotnet CLI доступен, .NET 10 SDK установлен)
+- CI: GitHub Actions → `.exe` для сотрудников
 
-## Текущее состояние (2026-07-01)
-Build падает с ошибкой:
-```
-The type or namespace name 'SIPCallUserAgent' could not be found
-The type or namespace name 'SIPRegistrarUserAgent' could not be found
-```
-Скорее всего API пакета SIPSorcery изменился. Нужно проверить доступные классы в最新 версии.
+## Текущее состояние (2026-07-02)
+SIP-слой полностью переписан под SIPSorcery 6.x API. Проект собирается (0 ошибок).
+
+### Что было исправлено
+- `SipService.cs` — переписан с нуля: `SIPClientUserAgent`/`SIPServerUserAgent` → `SIPUserAgent`, `VoIPMediaSession` получил `MediaEndPoints`, исправлены делегаты событий
+- `ConfigService.cs`, `SipLogger.cs`, `CallHistoryService.cs` — добавлен `using System.IO`
+- `MainViewModel.cs` — исправлен NullLoggerFactory (добавлен `using Microsoft.Extensions.Logging`)
+- `SipClient.csproj` — обновлены NuGet-версии: SIPSorcery 6.0.2, SIPSorceryMedia.Windows 6.0.4, SIPSorceryMedia.Encoders 8.0.7
+- `Resources/phone.ico` — удалена невалидная заглушка
 
 ## Структура проекта
 ```
 sip_client_cs/
 ├── SipClient/
-│   ├── SipClient.csproj        # .NET 8, SIPSorcery 5.5.0, CommunityToolkit.Mvvm
+│   ├── SipClient.csproj        # .NET 8, SIPSorcery 6.0.2, CommunityToolkit.Mvvm
 │   ├── Models/
 │   │   ├── SipConfig.cs        # Конфиг: server, port, user, pass, devices, auto-answer
 │   │   └── CallRecord.cs       # CSV формат: timestamp, number, direction, duration, status
 │   ├── Services/
-│   │   ├── SipService.cs       # SIP: регистрация, звонки (ИСПРАВИТЬ API)
+│   │   ├── SipService.cs       # SIP: SIPUserAgent, регистрация, звонки
 │   │   ├── ConfigService.cs    # JSON config load/save
 │   │   ├── CallHistoryService.cs # CSV history load/save
 │   │   ├── SipLogger.cs        # SIP пакеты в logs/sip_YYYY-MM-DD.log
@@ -64,14 +65,11 @@ sip_client_cs/
 - Сборка: `dotnet publish -r win-x64 --self-contained true -p:PublishSingleFile=true`
 
 ## Что нужно сделать дальше
-1. **Исправить SipService.cs** — найти правильные классы SIPSorcery для:
-   - SIP транспорт (UDP)
-   - Регистрация на сервер
-   - Исходящие звонки
-   - Входящие звонки
-2. **Проверить API SIPSorcery** — зайти на `https://github.com/sipsorcery/sipsorcery` и посмотреть примеры
-3. **Собрать и протестировать** — push → GitHub Actions → скачать `.exe`
-4. **Доделать UI** — возможно нужны дополнительные экраны
+1. **Пушить и проверить CI** — push → GitHub Actions → скачать `.exe`
+2. **Протестировать на реальном сервере** — регистрация на Infinity 1.9.8, звонки
+3. **Blind transfer** — добавить `SIPUserAgent.BlindTransfer()`
+4. **Выбор микрофона/динамика** — через `WindowsAudioEndPoint` с index параметром
+5. **Доделать UI** — возможно нужны дополнительные экраны
 
 ## Как запустить на Windows
 ```bash

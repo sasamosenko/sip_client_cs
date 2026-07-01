@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using SipClient.Models;
 using SipClient.Services;
 using System.Collections.ObjectModel;
@@ -61,8 +62,7 @@ public partial class MainViewModel : ObservableObject
         IsHistoryEmpty = CallHistory.Count == 0;
 
         // Create SIP service
-        var logger = new Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory()
-            .CreateLogger<SipService>();
+        ILogger<SipService> logger = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance.CreateLogger<SipService>();
         _sipService = new SipService(logger);
 
         _sipService.RegistrationStateChanged += OnRegistrationStateChanged;

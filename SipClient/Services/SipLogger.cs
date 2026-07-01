@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace SipClient.Services;
 
 public class SipLogger
