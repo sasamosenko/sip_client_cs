@@ -8,6 +8,7 @@ using SIPSorceryMedia.Abstractions;
 using SIPSorceryMedia.Encoders;
 using SIPSorceryMedia.Windows;
 using Microsoft.Extensions.Logging;
+using NAudio.Wave;
 using SipClient.Models;
 
 namespace SipClient.Services;
@@ -38,6 +39,28 @@ public class SipService
         _logger = logger;
         _sipLogger = new SipLogger();
         _config = new SipConfig();
+    }
+
+    public static List<AudioDeviceInfo> GetPlaybackDevices()
+    {
+        var devices = new List<AudioDeviceInfo>();
+        for (int i = 0; i < WaveOut.DeviceCount; i++)
+        {
+            var caps = WaveOut.GetCapabilities(i);
+            devices.Add(new AudioDeviceInfo { Index = i, Name = caps.ProductName });
+        }
+        return devices;
+    }
+
+    public static List<AudioDeviceInfo> GetCaptureDevices()
+    {
+        var devices = new List<AudioDeviceInfo>();
+        for (int i = 0; i < WaveIn.DeviceCount; i++)
+        {
+            var caps = WaveIn.GetCapabilities(i);
+            devices.Add(new AudioDeviceInfo { Index = i, Name = caps.ProductName });
+        }
+        return devices;
     }
 
     public async Task StartAsync(SipConfig config)
@@ -111,7 +134,10 @@ public class SipService
 
     private VoIPMediaSession CreateMediaSession()
     {
-        var audioEndPoint = new WindowsAudioEndPoint(new AudioEncoder());
+        var outIdx = _config.PlaybackDeviceId >= 0 ? _config.PlaybackDeviceId : 0;
+        var inIdx = _config.CaptureDeviceId >= 0 ? _config.CaptureDeviceId : 0;
+
+        var audioEndPoint = new WindowsAudioEndPoint(new AudioEncoder(), outIdx, inIdx, false, false);
         var mediaEndPoints = new MediaEndPoints
         {
             AudioSink = audioEndPoint,
@@ -167,6 +193,44 @@ public class SipService
             _sipLogger.LogError($"Make call failed: {ex.Message}");
             ErrorOccurred?.Invoke(ex.Message);
             CleanupCall();
+        }
+    }
+
+    public async Task<bool> BlindTransferAsync(string destination)
+    {
+        if (_userAgent == null || !_userAgent.IsCallActive)
+        {
+            ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
+            return false;
+        }
+
+        try
+        {
+            if (!SIPURI.TryParse(destination, out var uri))
+            {
+                uri = SIPURI.ParseSIPURIRelaxed($"{destination}@{_config.Server}");
+            }
+
+            _sipLogger.LogEvent($"Blind transfer to {destination}");
+            var result = await _userAgent.BlindTransfer(uri, TimeSpan.FromSeconds(10), CancellationToken.None);
+
+            if (result)
+            {
+                _sipLogger.LogEvent("Transfer accepted by remote");
+            }
+            else
+            {
+                _sipLogger.LogEvent("Transfer rejected by remote");
+                ErrorOccurred?.Invoke("Трансфер отклонён");
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Transfer failed: {ex.Message}");
+            ErrorOccurred?.Invoke($"Ошибка трансфера: {ex.Message}");
+            return false;
         }
     }
 
@@ -292,4 +356,11 @@ public class SipService
     }
 
     public string GetLogPath() => _sipLogger.GetLogPath();
+}
+
+public class AudioDeviceInfo
+{
+    public int Index { get; set; }
+    public string Name { get; set; } = "";
+    public override string ToString() => Name;
 }

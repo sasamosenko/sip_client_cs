@@ -27,6 +27,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _isMuted;
     [ObservableProperty] private bool _isHistoryEmpty = true;
+    [ObservableProperty] private bool _showTransferDialog;
 
     [ObservableProperty] private string _server = "";
     [ObservableProperty] private int _port = 5060;
@@ -36,8 +37,14 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _autoAnswerDelay = 3;
     [ObservableProperty] private int _micVolume = 80;
     [ObservableProperty] private int _speakerVolume = 80;
+    [ObservableProperty] private string _transferNumber = "";
+
+    [ObservableProperty] private AudioDeviceInfo? _selectedPlaybackDevice;
+    [ObservableProperty] private AudioDeviceInfo? _selectedCaptureDevice;
 
     public ObservableCollection<CallRecord> CallHistory { get; } = new();
+    public ObservableCollection<AudioDeviceInfo> PlaybackDevices { get; } = new();
+    public ObservableCollection<AudioDeviceInfo> CaptureDevices { get; } = new();
 
     public MainViewModel()
     {
@@ -61,6 +68,9 @@ public partial class MainViewModel : ObservableObject
             CallHistory.Add(record);
         IsHistoryEmpty = CallHistory.Count == 0;
 
+        // Load audio devices
+        LoadAudioDevices();
+
         // Create SIP service
         ILogger<SipService> logger = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance.CreateLogger<SipService>();
         _sipService = new SipService(logger);
@@ -70,6 +80,29 @@ public partial class MainViewModel : ObservableObject
         _sipService.CallStateChanged += OnCallStateChanged;
         _sipService.CallEnded += OnCallEnded;
         _sipService.ErrorOccurred += OnErrorOccurred;
+    }
+
+    private void LoadAudioDevices()
+    {
+        PlaybackDevices.Clear();
+        CaptureDevices.Clear();
+
+        foreach (var device in SipService.GetPlaybackDevices())
+            PlaybackDevices.Add(device);
+
+        foreach (var device in SipService.GetCaptureDevices())
+            CaptureDevices.Add(device);
+
+        // Restore saved device selection
+        if (_config.PlaybackDeviceId >= 0 && _config.PlaybackDeviceId < PlaybackDevices.Count)
+            SelectedPlaybackDevice = PlaybackDevices.FirstOrDefault(d => d.Index == _config.PlaybackDeviceId);
+        else if (PlaybackDevices.Count > 0)
+            SelectedPlaybackDevice = PlaybackDevices[0];
+
+        if (_config.CaptureDeviceId >= 0 && _config.CaptureDeviceId < CaptureDevices.Count)
+            SelectedCaptureDevice = CaptureDevices.FirstOrDefault(d => d.Index == _config.CaptureDeviceId);
+        else if (CaptureDevices.Count > 0)
+            SelectedCaptureDevice = CaptureDevices[0];
     }
 
     [RelayCommand]
@@ -139,9 +172,53 @@ public partial class MainViewModel : ObservableObject
         _config.AutoAnswerDelaySeconds = AutoAnswerDelay;
         _config.MicVolume = MicVolume;
         _config.SpeakerVolume = SpeakerVolume;
+
+        if (SelectedPlaybackDevice != null)
+            _config.PlaybackDeviceId = SelectedPlaybackDevice.Index;
+        if (SelectedCaptureDevice != null)
+            _config.CaptureDeviceId = SelectedCaptureDevice.Index;
+
         _configService.SaveConfig(_config);
         _notificationService.ShowNotification("Сохранено", "Настройки обновлены", NotificationType.Success);
         ShowSettings = false;
+    }
+
+    [RelayCommand]
+    private void OpenTransferDialog()
+    {
+        if (!IsInCall) return;
+        TransferNumber = "";
+        ShowTransferDialog = true;
+    }
+
+    [RelayCommand]
+    private async Task ExecuteTransferAsync()
+    {
+        if (string.IsNullOrEmpty(TransferNumber)) return;
+
+        ShowTransferDialog = false;
+        StatusText = $"Трансфер на {TransferNumber}...";
+        StatusBrush = "#FFC107";
+
+        var result = await _sipService.BlindTransferAsync(TransferNumber);
+
+        if (result)
+        {
+            StatusText = "Трансфер выполнен";
+            StatusBrush = "#4CAF50";
+            _notificationService.ShowNotification("Трансфер", $"Вызов переведён на {TransferNumber}", NotificationType.Success);
+        }
+        else
+        {
+            StatusText = "Трансфер отклонён";
+            StatusBrush = "#FF5252";
+        }
+    }
+
+    [RelayCommand]
+    private void CancelTransfer()
+    {
+        ShowTransferDialog = false;
     }
 
     private void OnRegistrationStateChanged(int code, string reason)
@@ -207,7 +284,7 @@ public partial class MainViewModel : ObservableObject
 
     private void OnCallStateChanged(string callId, int state, string reason)
     {
-        if (state == 5) // Established
+        if (state == 5)
         {
             IsInCall = true;
             _callStartTime = DateTime.Now;

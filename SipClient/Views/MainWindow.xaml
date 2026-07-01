@@ -130,16 +130,20 @@
                                    VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Grid>
 
-                    <!-- Mute + Hangup -->
+                    <!-- Mute + Transfer + Hangup -->
                     <Grid Width="280">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="🔇 Mute" Command="{Binding ToggleMuteCommand}"
                                 Style="{StaticResource GhostButton}" Height="44"/>
-                        <Button Grid.Column="2" Content="挂断" Command="{Binding HangupCommand}"
+                        <Button Grid.Column="2" Content="↗ Transfer" Command="{Binding OpenTransferDialogCommand}"
+                                Style="{StaticResource GhostButton}" Height="44"/>
+                        <Button Grid.Column="4" Content="挂断" Command="{Binding HangupCommand}"
                                 Style="{StaticResource DangerButton}" Height="44"/>
                     </Grid>
                 </StackPanel>
@@ -177,6 +181,27 @@
                                          Background="{StaticResource SurfaceCardBrush}"
                                          Foreground="{StaticResource TextPrimaryBrush}"
                                          BorderBrush="Transparent" BorderThickness="2"/>
+
+                            <TextBlock Text="Аудиоустройства" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
+                            <TextBlock Text="Микрофон" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" Margin="0,0,0,4"/>
+                            <ComboBox ItemsSource="{Binding CaptureDevices}"
+                                      SelectedItem="{Binding SelectedCaptureDevice}"
+                                      DisplayMemberPath="Name"
+                                      Padding="12,8" FontSize="14"
+                                      Background="{StaticResource SurfaceCardBrush}"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      BorderBrush="Transparent" BorderThickness="2"/>
+                            <TextBlock Text="Динамик" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" Margin="0,8,0,4"/>
+                            <ComboBox ItemsSource="{Binding PlaybackDevices}"
+                                      SelectedItem="{Binding SelectedPlaybackDevice}"
+                                      DisplayMemberPath="Name"
+                                      Padding="12,8" FontSize="14"
+                                      Background="{StaticResource SurfaceCardBrush}"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      BorderBrush="Transparent" BorderThickness="2"/>
 
                             <TextBlock Text="Автоответ" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
@@ -276,6 +301,35 @@
                 </Border>
             </Grid>
         </Grid>
+
+        <!-- Transfer Dialog Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="4" Background="#CC000000" Panel.ZIndex="100"
+                Visibility="{Binding ShowTransferDialog, Converter={StaticResource BoolToVis}}">
+            <Border Style="{StaticResource CardBorder}" VerticalAlignment="Center"
+                    HorizontalAlignment="Center" Width="320" Margin="20">
+                <StackPanel>
+                    <TextBlock Text="Blind Transfer" FontSize="18" FontWeight="SemiBold"
+                               Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                    <TextBlock Text="Номер абонента:" FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"/>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="Отмена"
+                                Command="{Binding CancelTransferCommand}"
+                                Style="{StaticResource GhostButton}" Height="40"/>
+                        <Button Grid.Column="2" Content="Перевести"
+                                Command="{Binding ExecuteTransferCommand}"
+                                Style="{StaticResource PrimaryButton}" Height="40"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Border>
 
         <!-- Connect Button (shown when offline) -->
         <Border Grid.Row="3" Padding="16,12" Background="#16213E"

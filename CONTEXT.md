@@ -30,13 +30,13 @@ sip_client_cs/
 │   │   ├── SipConfig.cs        # Конфиг: server, port, user, pass, devices, auto-answer
 │   │   └── CallRecord.cs       # CSV формат: timestamp, number, direction, duration, status
 │   ├── Services/
-│   │   ├── SipService.cs       # SIP: SIPUserAgent, регистрация, звонки
+│   │   ├── SipService.cs       # SIP: SIPUserAgent, регистрация, звонки, blind transfer, устройства
 │   │   ├── ConfigService.cs    # JSON config load/save
 │   │   ├── CallHistoryService.cs # CSV history load/save
 │   │   ├── SipLogger.cs        # SIP пакеты в logs/sip_YYYY-MM-DD.log
 │   │   └── NotificationService.cs # Toast уведомления + звуки
 │   ├── ViewModels/
-│   │   └── MainViewModel.cs    # MVVM: connect, call, hangup, answer, settings
+│   │   └── MainViewModel.cs    # MVVM: connect, call, hangup, answer, transfer, devices, settings
 │   ├── Views/
 │   │   ├── MainWindow.xaml     # Красивый dark theme UI
 │   │   └── MainWindow.xaml.cs
@@ -67,9 +67,7 @@ sip_client_cs/
 ## Что нужно сделать дальше
 1. **Пушить и проверить CI** — push → GitHub Actions → скачать `.exe`
 2. **Протестировать на реальном сервере** — регистрация на Infinity 1.9.8, звонки
-3. **Blind transfer** — добавить `SIPUserAgent.BlindTransfer()`
-4. **Выбор микрофона/динамика** — через `WindowsAudioEndPoint` с index параметром
-5. **Доделать UI** — возможно нужны дополнительные экраны
+3. **Доделать UI** — возможно нужны дополнительные экраны
 
 ## Как запустить на Windows
 ```bash
@@ -84,7 +82,8 @@ dotnet publish SipClient/SipClient.csproj -c Release -r win-x64 --self-contained
 ## Стек
 - **Язык:** C# / .NET 8
 - **UI:** WPF (dark theme, кастомные стили)
-- **SIP:** SIPSorcery (NuGet пакет)
+- **SIP:** SIPSorcery 6.0.2 (NuGet)
+- **Audio:** NAudio 2.2.1 (устройства), SIPSorceryMedia.Windows 6.0.4
 - **MVVM:** CommunityToolkit.Mvvm
 - **JSON:** Newtonsoft.Json
 - **Сборка:** GitHub Actions + dotnet publish
