@@ -23,7 +23,7 @@ public class CallRecord
         _ => ""
     };
 
-    public string DirectionIcon => Direction == "in" ? "📥" : "📤";
+    public string DirectionIcon => Direction == "in" ? "IN" : "OUT";
 
     public string DirectionColor => Direction == "in"
         ? "#4CAF50"
@@ -33,6 +33,6 @@ public class CallRecord
     {
         "missed" => new SolidColorBrush(Color.FromRgb(255, 82, 82)),
         "transfer" => new SolidColorBrush(Color.FromRgb(255, 193, 7)),
-        _ => new SolidColorBrush(Colors.Transparent)
+        _ => new SolidColorBrush(Color.FromRgb(160, 160, 176))
     };
 }

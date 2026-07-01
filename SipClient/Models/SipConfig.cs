@@ -12,4 +12,7 @@ public class SipConfig
     public int SpeakerVolume { get; set; } = 80;
     public bool AutoAnswerEnabled { get; set; } = false;
     public int AutoAnswerDelaySeconds { get; set; } = 3;
+    public int RtpPortMin { get; set; } = 10000;
+    public int RtpPortMax { get; set; } = 20000;
+    public int RegistrationExpiry { get; set; } = 300;
 }

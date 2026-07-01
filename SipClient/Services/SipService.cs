@@ -97,7 +97,7 @@ public class SipService
                 _config.Username,
                 _config.Password,
                 _config.Server,
-                300,
+                _config.RegistrationExpiry,
                 maxRegistrationAttemptTimeout: 15,
                 registerFailureRetryInterval: 10,
                 maxRegisterAttempts: 0,

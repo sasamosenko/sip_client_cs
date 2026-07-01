@@ -211,13 +211,49 @@
                             <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="60"/>
+                                    <ColumnDefinition Width="70"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Задержка (сек):"
                                            Foreground="{StaticResource TextSecondaryBrush}"
                                            VerticalAlignment="Center"/>
                                 <TextBox Grid.Column="1" Text="{Binding AutoAnswerDelay}"
                                          Style="{StaticResource ModernTextBox}"/>
+                            </Grid>
+
+                            <TextBlock Text="Регистрация" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="70"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Период перерегистрации (сек):"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding RegistrationExpiry}"
+                                         Style="{StaticResource ModernTextBox}"/>
+                            </Grid>
+
+                            <TextBlock Text="RTP порты (медиа)" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="От:" Foreground="{StaticResource TextSecondaryBrush}"
+                                               FontSize="12" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding RtpPortMin}"
+                                             Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="До:" Foreground="{StaticResource TextSecondaryBrush}"
+                                               FontSize="12" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding RtpPortMax}"
+                                             Style="{StaticResource ModernTextBox}"/>
+                                </StackPanel>
                             </Grid>
 
                             <Button Content="Сохранить" Command="{Binding SaveSettingsCommand}"

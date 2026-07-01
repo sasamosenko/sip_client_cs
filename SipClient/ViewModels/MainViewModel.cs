@@ -38,6 +38,9 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _micVolume = 80;
     [ObservableProperty] private int _speakerVolume = 80;
     [ObservableProperty] private string _transferNumber = "";
+    [ObservableProperty] private int _rtpPortMin = 10000;
+    [ObservableProperty] private int _rtpPortMax = 20000;
+    [ObservableProperty] private int _registrationExpiry = 300;
 
     [ObservableProperty] private AudioDeviceInfo? _selectedPlaybackDevice;
     [ObservableProperty] private AudioDeviceInfo? _selectedCaptureDevice;
@@ -62,6 +65,9 @@ public partial class MainViewModel : ObservableObject
         AutoAnswerDelay = _config.AutoAnswerDelaySeconds;
         MicVolume = _config.MicVolume;
         SpeakerVolume = _config.SpeakerVolume;
+        RtpPortMin = _config.RtpPortMin;
+        RtpPortMax = _config.RtpPortMax;
+        RegistrationExpiry = _config.RegistrationExpiry;
 
         // Load history
         foreach (var record in _historyService.Load())
@@ -172,6 +178,9 @@ public partial class MainViewModel : ObservableObject
         _config.AutoAnswerDelaySeconds = AutoAnswerDelay;
         _config.MicVolume = MicVolume;
         _config.SpeakerVolume = SpeakerVolume;
+        _config.RtpPortMin = RtpPortMin;
+        _config.RtpPortMax = RtpPortMax;
+        _config.RegistrationExpiry = RegistrationExpiry;
 
         if (SelectedPlaybackDevice != null)
             _config.PlaybackDeviceId = SelectedPlaybackDevice.Index;
