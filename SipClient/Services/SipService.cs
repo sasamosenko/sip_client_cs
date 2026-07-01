@@ -92,12 +92,22 @@ public class SipService
 
         try
         {
+            var domain = string.IsNullOrEmpty(_config.Domain) ? _config.Server : _config.Domain;
+            var authUser = string.IsNullOrEmpty(_config.AuthUsername) ? _config.Username : _config.AuthUsername;
+            var sipAOR = SIPURI.ParseSIPURI($"sip:{_config.Username}@{domain}");
+            var contactURI = SIPURI.ParseSIPURI($"sip:{_config.Username}@{_config.Server}:{_config.Port}");
+
             _registrar = new SIPRegistrationUserAgent(
                 _sipTransport,
-                _config.Username,
+                null,
+                sipAOR,
+                authUser,
                 _config.Password,
+                domain,
                 _config.Server,
+                contactURI,
                 _config.RegistrationExpiry,
+                null,
                 maxRegistrationAttemptTimeout: 15,
                 registerFailureRetryInterval: 10,
                 maxRegisterAttempts: 0,

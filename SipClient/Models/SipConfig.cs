@@ -6,6 +6,10 @@ public class SipConfig
     public int Port { get; set; } = 5060;
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";
+    public string DisplayName { get; set; } = "SIP Client";
+    public string Domain { get; set; } = "";
+    public string AuthUsername { get; set; } = "";
+    public string UserAgent { get; set; } = "SipClient/1.0";
     public int CaptureDeviceId { get; set; } = -1;
     public int PlaybackDeviceId { get; set; } = -1;
     public int MicVolume { get; set; } = 80;
@@ -14,5 +18,5 @@ public class SipConfig
     public int AutoAnswerDelaySeconds { get; set; } = 3;
     public int RtpPortMin { get; set; } = 10000;
     public int RtpPortMax { get; set; } = 20000;
-    public int RegistrationExpiry { get; set; } = 300;
+    public int RegistrationExpiry { get; set; } = 600;
 }

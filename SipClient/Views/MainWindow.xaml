@@ -173,14 +173,26 @@
                             <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
                                      Tag="Порт"/>
+                            <TextBox Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
+                                     Tag="Домен (SIP realm, если отличается от сервера)"/>
                             <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
-                                     Tag="Логин"/>
+                                     Tag="Логин (SIP username)"/>
+                            <TextBox Text="{Binding AuthUsername, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
+                                     Tag="Auth логин (если отличается от SIP)"/>
                             <PasswordBox x:Name="PasswordBox" Margin="0,8,0,0"
                                          Padding="12,10" FontSize="14"
                                          Background="{StaticResource SurfaceCardBrush}"
                                          Foreground="{StaticResource TextPrimaryBrush}"
                                          BorderBrush="Transparent" BorderThickness="2"/>
+                            <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
+                                     Tag="Отображаемое имя (From header)"/>
+                            <TextBox Text="{Binding UserAgent, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}" Margin="0,8,0,0"
+                                     Tag="User-Agent строка"/>
 
                             <TextBlock Text="Аудиоустройства" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>

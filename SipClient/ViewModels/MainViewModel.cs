@@ -33,6 +33,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int _port = 5060;
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
+    [ObservableProperty] private string _displayName = "SIP Client";
+    [ObservableProperty] private string _domain = "";
+    [ObservableProperty] private string _authUsername = "";
+    [ObservableProperty] private string _userAgent = "SipClient/1.0";
     [ObservableProperty] private bool _autoAnswerEnabled;
     [ObservableProperty] private int _autoAnswerDelay = 3;
     [ObservableProperty] private int _micVolume = 80;
@@ -40,7 +44,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _transferNumber = "";
     [ObservableProperty] private int _rtpPortMin = 10000;
     [ObservableProperty] private int _rtpPortMax = 20000;
-    [ObservableProperty] private int _registrationExpiry = 300;
+    [ObservableProperty] private int _registrationExpiry = 600;
 
     [ObservableProperty] private AudioDeviceInfo? _selectedPlaybackDevice;
     [ObservableProperty] private AudioDeviceInfo? _selectedCaptureDevice;
@@ -61,6 +65,10 @@ public partial class MainViewModel : ObservableObject
         Port = _config.Port;
         Username = _config.Username;
         Password = _config.Password;
+        DisplayName = _config.DisplayName;
+        Domain = _config.Domain;
+        AuthUsername = _config.AuthUsername;
+        UserAgent = _config.UserAgent;
         AutoAnswerEnabled = _config.AutoAnswerEnabled;
         AutoAnswerDelay = _config.AutoAnswerDelaySeconds;
         MicVolume = _config.MicVolume;
@@ -174,6 +182,10 @@ public partial class MainViewModel : ObservableObject
         _config.Port = Port;
         _config.Username = Username;
         _config.Password = Password;
+        _config.DisplayName = DisplayName;
+        _config.Domain = Domain;
+        _config.AuthUsername = AuthUsername;
+        _config.UserAgent = UserAgent;
         _config.AutoAnswerEnabled = AutoAnswerEnabled;
         _config.AutoAnswerDelaySeconds = AutoAnswerDelay;
         _config.MicVolume = MicVolume;
