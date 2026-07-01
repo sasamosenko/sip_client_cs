@@ -1,7 +1,7 @@
 # SIP Client — Контекст проекта
 
 ## TL;DR
-Десктопный SIP-клиент для Windows. Стек: C# / .NET 8 + WPF + SIPSorcery. Автосборка через GitHub Actions → готовый `.exe` для сотрудников.
+Десктопный SIP-клиент для Windows. Стек: C# / .NET 8 + WPF + SIPSorcery. Сборка локально → `.exe` для сотрудников.
 
 ## Репозитории
 - **Python версия (заброшена):** `https://github.com/sasamosenko/sip_client` — pjsua2 + PySide6, не удалось собрать на Windows
