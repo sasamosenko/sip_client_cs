@@ -35,17 +35,27 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <Border Background="{TemplateBinding Background}"
+                    <Border x:Name="border" Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="8">
-                        <ScrollViewer x:Name="PART_ContentHost" 
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center"/>
+                        <Grid Margin="{TemplateBinding Padding}">
+                            <TextBlock x:Name="placeholder"
+                                       Text="{TemplateBinding Tag}"
+                                       Foreground="#555570"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Visibility="Collapsed"/>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          VerticalAlignment="Center"/>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsFocused" Value="True">
-                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="Text" Value="">
+                            <Setter TargetName="placeholder" Property="Visibility" Value="Visible"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

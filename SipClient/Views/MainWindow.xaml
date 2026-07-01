@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:SipClient.ViewModels"
-        Title="SIP Client" Height="750" Width="420"
+        Title="SIP Client" Height="750" Width="460"
         WindowStartupLocation="CenterScreen"
         Background="#1A1A2E"
         ResizeMode="CanMinimize">
@@ -65,15 +65,15 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Content="📞 Позвонить" Command="{Binding CallCommand}"
+                    <Button Grid.Column="0" Content="Вызов" Command="{Binding CallCommand}"
                             Style="{StaticResource SuccessButton}" Margin="0,0,6,0" Height="42"/>
-                    <Button Grid.Column="1" Content="📞 Ответить" Command="{Binding AnswerCommand}"
+                    <Button Grid.Column="1" Content="Ответить" Command="{Binding AnswerCommand}"
                             Style="{StaticResource PrimaryButton}" Margin="3,0,3,0" Height="42"
                             Visibility="{Binding IsIncomingCall, Converter={StaticResource BoolToVis}}"/>
-                    <Button Grid.Column="1" Content="✕ Сбросить" Command="{Binding HangupCommand}"
+                    <Button Grid.Column="1" Content="Сброс" Command="{Binding HangupCommand}"
                             Style="{StaticResource DangerButton}" Margin="3,0,3,0" Height="42"
                             Visibility="{Binding IsInCall, Converter={StaticResource BoolToVis}}"/>
-                    <Button Grid.Column="2" Content="⚙ Настройки" Command="{Binding ToggleSettingsCommand}"
+                    <Button Grid.Column="2" Content="Настройки" Command="{Binding ToggleSettingsCommand}"
                             Style="{StaticResource GhostButton}" Margin="6,0,0,0" Height="42"/>
                 </Grid>
             </StackPanel>
@@ -105,8 +105,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="36"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="🎤" FontSize="16" VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="0" Text="Mic" FontSize="11" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
                         <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
                                 Value="{Binding MicVolume, Mode=TwoWay}" Margin="8,0"/>
                         <TextBlock Grid.Column="2" Text="{Binding MicVolume, StringFormat={}{0}%}"
@@ -121,8 +121,8 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="36"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="🔊" FontSize="16" VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="0" Text="Spk" FontSize="11" VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
                         <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
                                 Value="{Binding SpeakerVolume, Mode=TwoWay}" Margin="8,0"/>
                         <TextBlock Grid.Column="2" Text="{Binding SpeakerVolume, StringFormat={}{0}%}"
@@ -139,11 +139,11 @@
                             <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="🔇 Mute" Command="{Binding ToggleMuteCommand}"
+                        <Button Grid.Column="0" Content="Mute" Command="{Binding ToggleMuteCommand}"
                                 Style="{StaticResource GhostButton}" Height="44"/>
-                        <Button Grid.Column="2" Content="↗ Transfer" Command="{Binding OpenTransferDialogCommand}"
+                        <Button Grid.Column="2" Content="Transfer" Command="{Binding OpenTransferDialogCommand}"
                                 Style="{StaticResource GhostButton}" Height="44"/>
-                        <Button Grid.Column="4" Content="挂断" Command="{Binding HangupCommand}"
+                        <Button Grid.Column="4" Content="Завершить" Command="{Binding HangupCommand}"
                                 Style="{StaticResource DangerButton}" Height="44"/>
                     </Grid>
                 </StackPanel>
