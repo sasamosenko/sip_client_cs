@@ -176,8 +176,7 @@
                                          Padding="12,10" FontSize="14"
                                          Background="{StaticResource SurfaceCardBrush}"
                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                         BorderBrush="Transparent" BorderThickness="2"
-                                         CornerRadius="8"/>
+                                         BorderBrush="Transparent" BorderThickness="2"/>
 
                             <TextBlock Text="Автоответ" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{StaticResource TextSecondaryBrush}" Margin="0,20,0,8"/>
