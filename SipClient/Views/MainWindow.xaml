@@ -6,7 +6,8 @@
         MinHeight="600" MinWidth="440"
         WindowStartupLocation="CenterScreen"
         Background="#1A1A2E"
-        ResizeMode="CanResizeWithGrip">
+        ResizeMode="CanResizeWithGrip"
+        Icon="pack://application:,,,/SipClient;component/Resources/phone.ico">
 
     <Window.DataContext>
         <vm:MainViewModel />
@@ -22,6 +23,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -30,26 +32,43 @@
         <Border Grid.Row="0" Background="#16213E" Padding="20,14">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
+                <!-- Phone icon -->
+                <Path Grid.Column="0" Data="M6.62,10.79C8.06,13.62 10.38,15.93 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5C20.55,15.5 21,15.95 21,16.5V20C21,20.55 20.55,21 20,21C10.61,21 3,13.39 3,4C3,3.45 3.45,3 4,3H7.5C8.05,3 8.5,3.45 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"
+                      Width="24" Height="24" Stretch="Uniform" Fill="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0">
                     <TextBlock Text="SIP Client" FontSize="20" FontWeight="Bold" Foreground="White"/>
                     <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{Binding StatusBrush}"
                                Margin="0,4,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
-                <Border Grid.Column="1" Width="12" Height="12" CornerRadius="6"
-                        Background="{Binding StatusBrush}" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                <Border Grid.Column="2" Width="12" Height="12" CornerRadius="6"
+                        Background="{Binding StatusBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Button Grid.Column="3" Command="{Binding ShowAboutCommand}"
+                        Style="{StaticResource IconButton}" Padding="6,4"
+                        ToolTip="О приложении" VerticalAlignment="Center">
+                    <Path Data="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10 10-4.48,10-10S17.52,2,12,2zm1,15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                          Width="16" Height="16" Stretch="Uniform"
+                          Fill="{StaticResource TextSecondaryBrush}"/>
+                </Button>
             </Grid>
         </Border>
 
         <!-- Dial Area -->
         <Border Grid.Row="1" Background="#0F3460" Padding="16,14">
             <StackPanel>
-                <Border Background="#1A1A2E" CornerRadius="10" Padding="14,12" Margin="0,0,0,12">
-                    <TextBlock Text="{Binding PhoneNumber}" FontSize="26" FontWeight="Light"
-                               Foreground="White" HorizontalAlignment="Center"
-                               TextAlignment="Center"/>
+                <Border Background="#1A1A2E" CornerRadius="10" Padding="0" Margin="0,0,0,12">
+                    <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="26" FontWeight="Light"
+                             Foreground="White" Background="Transparent"
+                             CaretBrush="White" SelectionBrush="{StaticResource PrimaryBrush}"
+                             Padding="14,12"
+                             HorizontalContentAlignment="Center"
+                             BorderThickness="0"
+                             KeyDown="PhoneNumber_KeyDown"/>
                 </Border>
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -57,19 +76,91 @@
                         <ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0" Content="Вызов" Command="{Binding CallCommand}"
-                            Style="{StaticResource SuccessButton}"/>
-                    <Button Grid.Column="2" Content="Настройки" Command="{Binding ToggleSettingsCommand}"
-                            Style="{StaticResource GhostButton}"/>
+
+                    <!-- Call / Hangup button (switches based on IsInCall) -->
+                    <Button Grid.Column="0" Command="{Binding CallCommand}"
+                            Style="{StaticResource SuccessButton}"
+                            Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Path Data="M6.62,10.79C8.06,13.62 10.38,15.93 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5C20.55,15.5 21,15.95 21,16.5V20C21,20.55 20.55,21 20,21C10.61,21 3,13.39 3,4C3,3.45 3.45,3 4,3H7.5C8.05,3 8.5,3.45 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"
+                                  Width="16" Height="16" Stretch="Uniform" Fill="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Вызов" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="0" Command="{Binding HangupCommand}"
+                            Style="{StaticResource DangerButton}"
+                            Visibility="{Binding IsInCall, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Path Data="M12,9c-1.6,0-3.15.25-4.6.72v3.1c0,.39-.23,.74-.56,.9-.98.49-1.87,1.12-2.66,1.85-.18,.18-.43,.28-.7,.28-.28,0-.53-.11-.71-.29L.29,13.08a.956.956,0,0,1-.29-.7c0-.28.11-.53.29-.71C3.34,8.78,7.46,7,12,7s8.66,1.78,11.71,4.67c.18,.18,.29,.43,.29,.71s-.11.53-.29.71l-2.48,2.48c-.18.18-.43.29-.71.29-.27,0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85a.994.994,0,0,1-.56-.9v-3.1C15.15,9.25,13.6,9,12,9z"
+                                  Width="16" Height="16" Stretch="Uniform" Fill="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Завершить" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Settings button -->
+                    <Button Grid.Column="2" Command="{Binding ToggleSettingsCommand}"
+                            Style="{StaticResource GhostButton}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Path Data="M19.14,12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24,0-.43.17-.47.41l-.36,2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47,0-.59.22L2.74,8.87c-.12.21-.08.47.12.61l2.03,1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03,1.58a.49.49 0 00-.12.61l1.92,3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36,2.54c.05.24.24.41.48.41h3.84c.24,0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47,0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6,1.62 3.6,3.6-1.62,3.6-3.6,3.6z"
+                                  Width="16" Height="16" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Настройки" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </StackPanel>
         </Border>
 
+        <!-- Volume Controls (between dial and history) -->
+        <Border Grid.Row="2" Background="#16213E" Padding="16,10"
+                Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Speaker Volume -->
+                <Grid Grid.Column="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="42"/>
+                    </Grid.ColumnDefinitions>
+                    <Path Grid.Column="0" Data="M3,9v6h4l5,5V4L7,9H3zm13.5,3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
+                          Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
+                            Value="{Binding SpeakerVolume, Mode=TwoWay}" Minimum="0" Maximum="150"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2" Text="{Binding SpeakerVolume, StringFormat={}{0:F0}%}"
+                               FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                </Grid>
+
+                <!-- Mic Volume -->
+                <Grid Grid.Column="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="42"/>
+                    </Grid.ColumnDefinitions>
+                    <Path Grid.Column="0" Data="M12,14c1.66,0,3-1.34,3-3V5c0-1.66-1.34-3-3-3S9,3.34,9,5v6C9,12.66,10.34,14,12,14z M17,11c0,2.76-2.24,5-5,5s-5-2.24-5-5H5c0,3.53,2.61,6.43,6,6.92V21h2v-3.08c3.39-0.49,6-3.39,6-6.92H17z"
+                          Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                    <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
+                            Value="{Binding MicVolume, Mode=TwoWay}" Minimum="0" Maximum="150"
+                            Margin="8,0"/>
+                    <TextBlock Grid.Column="2" Text="{Binding MicVolume, StringFormat={}{0:F0}%}"
+                               FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </Border>
+
         <!-- Main Content Area -->
-        <Grid Grid.Row="2" Margin="0">
+        <Grid Grid.Row="3">
 
             <!-- === ACTIVE CALL PANEL === -->
-            <Border Grid.Row="0" Margin="16,12" Style="{StaticResource CardBorder}"
+            <Border Margin="16,12" Style="{StaticResource CardBorder}"
                     Visibility="{Binding IsInCall, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <TextBlock Text="Активный звонок" FontSize="14"
@@ -81,37 +172,7 @@
                                Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"
                                Margin="0,0,0,24"/>
 
-                    <Grid Margin="0,0,0,16" Width="300" HorizontalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="40"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Mic" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
-                                Value="{Binding MicVolume, Mode=TwoWay}" Margin="8,0"/>
-                        <TextBlock Grid.Column="2" Text="{Binding MicVolume, StringFormat={}{0}%}"
-                                   FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <Grid Margin="0,0,0,20" Width="300" HorizontalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="40"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Spk" FontSize="11"
-                                   VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <Slider Grid.Column="1" Style="{StaticResource ModernSlider}"
-                                Value="{Binding SpeakerVolume, Mode=TwoWay}" Margin="8,0"/>
-                        <TextBlock Grid.Column="2" Text="{Binding SpeakerVolume, StringFormat={}{0}%}"
-                                   FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"/>
-                    </Grid>
-
-                    <Grid Width="300" HorizontalAlignment="Center">
+                    <Grid Width="380" HorizontalAlignment="Center">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="8"/>
@@ -119,172 +180,37 @@
                             <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="Mute" Command="{Binding ToggleMuteCommand}"
-                                Style="{StaticResource GhostButton}"/>
-                        <Button Grid.Column="2" Content="Transfer" Command="{Binding OpenTransferDialogCommand}"
-                                Style="{StaticResource GhostButton}"/>
-                        <Button Grid.Column="4" Content="Завершить" Command="{Binding HangupCommand}"
-                                Style="{StaticResource DangerButton}"/>
+                        <Button Grid.Column="0" Command="{Binding ToggleMuteCommand}"
+                                Style="{StaticResource GhostButton}" HorizontalContentAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Data="M16.5,12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45,2.45c.03-.2.05-.41.05-.63zm2.5,0c0,.94-.2,1.82-.54,2.64l1.51,1.51C20.63,14.91,21,13.5,21,12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86,5,3.54,5,6.71zM4.27,3L3,4.27 7.73,9H3v6h4l5,5v-6.73l4.25,4.25c-.67.52-1.42.93-2.25,1.18v2.06c1.38-.31,2.63-.95,3.69-1.81L19.73,21 21,19.73l-9-9L4.27,3zM12,4L9.91,6.09 12,8.18V4z"
+                                      Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Mute" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2" Command="{Binding OpenTransferDialogCommand}"
+                                Style="{StaticResource GhostButton}" HorizontalContentAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Data="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10 10-4.48,10-10S17.52,2,12,2zm-2,15l-5-5 1.41-1.41L10,14.17l7.59-7.59L19,8l-9,9z"
+                                      Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Transfer" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="4" Command="{Binding HangupCommand}"
+                                Style="{StaticResource DangerButton}" HorizontalContentAlignment="Center">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Path Data="M12,9c-1.6,0-3.15.25-4.6.72v3.1c0,.39-.23,.74-.56,.9-.98.49-1.87,1.12-2.66,1.85-.18,.18-.43,.28-.7,.28-.28,0-.53-.11-.71-.29L.29,13.08a.956.956,0,0,1-.29-.7c0-.28.11-.53.29-.71C3.34,8.78,7.46,7,12,7s8.66,1.78,11.71,4.67c.18,.18,.29,.43,.29,.71s-.11.53-.29.71l-2.48,2.48c-.18.18-.43.29-.71.29-.27,0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85a.994.994,0,0,1-.56-.9v-3.1C15.15,9.25,13.6,9,12,9z"
+                                      Width="14" Height="14" Stretch="Uniform" Fill="White" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Завершить" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- Settings solid background overlay -->
-            <Border Grid.Row="0" Margin="16,12" Background="#E61A1A2E" CornerRadius="12"
-                    Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}"
-                    Panel.ZIndex="15"/>
-
-            <!-- Settings panel (on top of overlay) -->
-            <Border Grid.Row="0" Margin="16,12" Style="{StaticResource CardBorder}"
-                    Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}"
-                    Panel.ZIndex="20">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0" Margin="0,0,0,12">
-                        <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold"
-                                   Foreground="White" VerticalAlignment="Center"/>
-                        <Button Content="Закрыть" HorizontalAlignment="Right"
-                                Command="{Binding ToggleSettingsCommand}"
-                                Style="{StaticResource GhostButton}" Padding="12,6"/>
-                    </Grid>
-
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="SIP Аккаунт" Style="{StaticResource SectionHeader}"/>
-
-                            <TextBlock Text="Сервер" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Text="{Binding Server, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="main.infinity.web-zaim.ru"/>
-
-                            <TextBlock Text="Порт" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="5060"/>
-
-                            <TextBlock Text="Домен (SIP realm)" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="domain.server.com"/>
-
-                            <TextBlock Text="Логин" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="SIP username"/>
-
-                            <TextBlock Text="Auth логин" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding AuthUsername, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="Если отличается от логина"/>
-
-                            <TextBlock Text="Пароль" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <PasswordBox x:Name="PasswordBox"
-                                             Padding="12,10" FontSize="14"
-                                             Background="{StaticResource SurfaceCardBrush}"
-                                             Foreground="{StaticResource TextPrimaryBrush}"
-                                             BorderBrush="#585878" BorderThickness="1"/>
-                                <ToggleButton x:Name="PasswordToggle" Grid.Column="1"
-                                              Width="42" Margin="6,0,0,0"
-                                              IsChecked="False"
-                                              Cursor="Hand"
-                                              ToolTip="Показать пароль"
-                                              Click="PasswordToggle_Click">
-                                    <ToggleButton.Template>
-                                        <ControlTemplate TargetType="ToggleButton">
-                                            <Border x:Name="b" Background="{StaticResource SurfaceCardBrush}"
-                                                    BorderBrush="#585878" BorderThickness="1" CornerRadius="8"
-                                                    Padding="10,0">
-                                                <TextBlock x:Name="eyeText" Text="Показать"
-                                                           FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
-                                                           VerticalAlignment="Center"/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsChecked" Value="True">
-                                                    <Setter TargetName="eyeText" Property="Text" Value="Скрыть"/>
-                                                    <Setter TargetName="b" Property="Background" Value="{StaticResource PrimaryBrush}"/>
-                                                    <Setter TargetName="eyeText" Property="Foreground" Value="White"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </ToggleButton.Template>
-                                </ToggleButton>
-                            </Grid>
-
-                            <TextBlock Text="Отображаемое имя" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="From header"/>
-
-                            <TextBlock Text="User-Agent" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <TextBox Text="{Binding UserAgent, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}" Tag="SipClient/1.0"/>
-
-                            <TextBlock Text="Аудиоустройства" Style="{StaticResource SectionHeader}"/>
-
-                            <TextBlock Text="Микрофон" Style="{StaticResource FieldLabel}"/>
-                            <ComboBox ItemsSource="{Binding CaptureDevices}"
-                                      SelectedItem="{Binding SelectedCaptureDevice}"
-                                      DisplayMemberPath="Name" Padding="12,8" FontSize="14"
-                                      Background="{StaticResource SurfaceCardBrush}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="#585878" BorderThickness="1"/>
-
-                            <TextBlock Text="Динамик" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
-                            <ComboBox ItemsSource="{Binding PlaybackDevices}"
-                                      SelectedItem="{Binding SelectedPlaybackDevice}"
-                                      DisplayMemberPath="Name" Padding="12,8" FontSize="14"
-                                      Background="{StaticResource SurfaceCardBrush}"
-                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                      BorderBrush="#585878" BorderThickness="1"/>
-
-                            <TextBlock Text="Автоответ" Style="{StaticResource SectionHeader}"/>
-                            <CheckBox Content="Включить автоответ"
-                                      IsChecked="{Binding AutoAnswerEnabled}"
-                                      Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
-
-                            <TextBlock Text="Задержка (сек)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Text="{Binding AutoAnswerDelay}"
-                                     Style="{StaticResource ModernTextBox}" Tag="3"/>
-
-                            <TextBlock Text="Регистрация" Style="{StaticResource SectionHeader}"/>
-                            <TextBlock Text="Период перерегистрации (сек)" Style="{StaticResource FieldLabel}"/>
-                            <TextBox Text="{Binding RegistrationExpiry}"
-                                     Style="{StaticResource ModernTextBox}" Tag="600"/>
-
-                            <TextBlock Text="RTP порты (медиа)" Style="{StaticResource SectionHeader}"/>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <TextBlock Text="От" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox Text="{Binding RtpPortMin}"
-                                             Style="{StaticResource ModernTextBox}" Tag="10000"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="До" Style="{StaticResource FieldLabel}"/>
-                                    <TextBox Text="{Binding RtpPortMax}"
-                                             Style="{StaticResource ModernTextBox}" Tag="20000"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Button Content="Сохранить настройки" Command="{Binding SaveSettingsCommand}"
-                                    Style="{StaticResource PrimaryButton}" Margin="0,24,0,8"
-                                    HorizontalAlignment="Stretch"/>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
-
-            <!-- === CALL HISTORY === -->
-            <Border Grid.Row="0" Margin="16,12" Style="{StaticResource CardBorder}"
-                    Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}"
-                    Panel.ZIndex="5">
+            <!-- === CALL HISTORY (always visible) === -->
+            <Border Margin="16,12" Style="{StaticResource CardBorder}"
+                    Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -296,13 +222,15 @@
 
                     <ListBox Grid.Row="1" ItemsSource="{Binding CallHistory}"
                              Style="{StaticResource ModernListBox}"
-                             ItemContainerStyle="{StaticResource ModernListBoxItem}">
+                             ItemContainerStyle="{StaticResource ModernListBoxItem}"
+                             KeyDown="CallHistory_KeyDown">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="44"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
@@ -329,7 +257,7 @@
                                                Foreground="{StaticResource TextSecondaryBrush}"/>
 
                                     <StackPanel Grid.Column="2" Grid.RowSpan="2"
-                                                VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,4,0">
                                         <TextBlock Text="{Binding DurationStr}" FontSize="13"
                                                    Foreground="{StaticResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Right"/>
@@ -337,6 +265,16 @@
                                                    Foreground="{Binding StatusBrush}"
                                                    HorizontalAlignment="Right"/>
                                     </StackPanel>
+
+                                    <Button Grid.Column="3" Grid.RowSpan="2"
+                                            Tag="{Binding}" Click="CopyCallRecord_Click"
+                                            Style="{StaticResource IconButton}" Padding="6"
+                                            VerticalAlignment="Center" ToolTip="Копировать (CSV)">
+                                        <Canvas Width="14" Height="14">
+                                            <Path Data="M4,4 L10,4 L10,12 L4,12 Z" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.2" Fill="Transparent"/>
+                                            <Path Data="M6,2 L14,2 L14,10 L12,10 L12,4 L6,4 Z" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.2" Fill="Transparent"/>
+                                        </Canvas>
+                                    </Button>
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -351,8 +289,34 @@
 
         </Grid>
 
+        <!-- Connect Button (bottom bar) -->
+        <Border Grid.Row="4" Padding="16,12" Background="#16213E"
+                Visibility="{Binding IsRegistered, Converter={StaticResource InvertedBoolToVis}}">
+            <Button Command="{Binding ConnectCommand}"
+                    Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Path Data="M1,9l2,2c4.97-4.97,13.03-4.97,18,0l2-2C16.93,2.93,7.08,2.93,1,9z M9,17l3,3 3-3c-1.65-1.66-4.34-1.66-6,0z M5,13l2,2c2.76-2.76,7.24-2.76,10,0l2-2C15.14,9.14,8.87,9.14,5,13z"
+                          Width="16" Height="16" Stretch="Uniform" Fill="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Подключиться" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </Border>
+
+        <!-- Re-register Button (bottom bar, visible when registered) -->
+        <Border Grid.Row="4" Padding="16,12" Background="#16213E"
+                Visibility="{Binding IsRegistered, Converter={StaticResource BoolToVis}}">
+            <Button Command="{Binding ReregisterCommand}"
+                    Style="{StaticResource GhostButton}" HorizontalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Path Data="M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0-7.99,3.58-7.99,8s3.57,8,7.99,8c3.73,0,6.84-2.55,7.73-6h-2.08c-.82,2.33-3.04,4-5.65,4-3.31,0-6-2.69-6-6s2.69-6,6-6c1.66,0,3.14.69,4.22,1.78L13,11h7V4l-2.35,2.35z"
+                          Width="16" Height="16" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Перерегистрация" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+        </Border>
+
         <!-- Transfer Dialog -->
-        <Border Grid.Row="0" Grid.RowSpan="4" Background="#CC000000" Panel.ZIndex="100"
+        <Border Grid.Row="0" Grid.RowSpan="5" Background="#CC000000" Panel.ZIndex="100"
                 Visibility="{Binding ShowTransferDialog, Converter={StaticResource BoolToVis}}">
             <Border Style="{StaticResource CardBorder}" VerticalAlignment="Center"
                     HorizontalAlignment="Center" MinWidth="320" Margin="20">
@@ -379,11 +343,5 @@
             </Border>
         </Border>
 
-        <!-- Connect Button (bottom bar) -->
-        <Border Grid.Row="3" Padding="16,12" Background="#16213E"
-                Visibility="{Binding IsRegistered, Converter={StaticResource InvertedBoolToVis}}">
-            <Button Content="Подключиться" Command="{Binding ConnectCommand}"
-                    Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"/>
-        </Border>
     </Grid>
 </Window>

@@ -9,6 +9,26 @@
                 <ResourceDictionary Source="Resources/Styles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Global font -->
+            <FontFamily x:Key="AppFont">Segoe UI, Segoe UI Variable Display, Arial</FontFamily>
+
+            <!-- Base style for all TextBlocks -->
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            </Style>
+            <!-- Base style for all TextBoxes -->
+            <Style TargetType="TextBox">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            </Style>
+            <!-- Base style for all Buttons -->
+            <Style TargetType="Button">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            </Style>
+            <!-- Base style for all ComboBoxes -->
+            <Style TargetType="ComboBox">
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+            </Style>
+
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <conv:InvertedBoolToVisibilityConverter x:Key="InvertedBoolToVis"/>
             <conv:StringToEmptyVisibilityConverter x:Key="StringToEmptyVis"/>

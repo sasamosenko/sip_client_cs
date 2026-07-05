@@ -24,7 +24,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _isInCall;
     [ObservableProperty] private bool _isIncomingCall;
     [ObservableProperty] private bool _isRegistered;
-    [ObservableProperty] private bool _showSettings;
     [ObservableProperty] private bool _isMuted;
     [ObservableProperty] private bool _isHistoryEmpty = true;
     [ObservableProperty] private bool _showTransferDialog;
@@ -39,15 +38,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string _userAgent = "SipClient/1.0";
     [ObservableProperty] private bool _autoAnswerEnabled;
     [ObservableProperty] private int _autoAnswerDelay = 3;
-    [ObservableProperty] private int _micVolume = 80;
-    [ObservableProperty] private int _speakerVolume = 80;
+    [ObservableProperty] private double _micVolume = 100;
+    [ObservableProperty] private double _speakerVolume = 100;
     [ObservableProperty] private string _transferNumber = "";
+    [ObservableProperty] private int _localPort = 5080;
     [ObservableProperty] private int _rtpPortMin = 10000;
     [ObservableProperty] private int _rtpPortMax = 20000;
     [ObservableProperty] private int _registrationExpiry = 600;
+    [ObservableProperty] private double _ringVolume = 80;
+    [ObservableProperty] private bool _sipLoggingEnabled;
 
     [ObservableProperty] private AudioDeviceInfo? _selectedPlaybackDevice;
     [ObservableProperty] private AudioDeviceInfo? _selectedCaptureDevice;
+
+    public ObservableCollection<CodecOption> CodecOptions { get; } = new();
 
     public ObservableCollection<CallRecord> CallHistory { get; } = new();
     public ObservableCollection<AudioDeviceInfo> PlaybackDevices { get; } = new();
@@ -76,6 +80,22 @@ public partial class MainViewModel : ObservableObject
         RtpPortMin = _config.RtpPortMin;
         RtpPortMax = _config.RtpPortMax;
         RegistrationExpiry = _config.RegistrationExpiry;
+        RingVolume = _config.RingVolume;
+        _notificationService.SetRingVolume(RingVolume);
+        SipLoggingEnabled = _config.SipLoggingEnabled;
+        LocalPort = _config.LocalPort;
+
+        // Load codecs
+        var allCodecs = new (string name, string desc, int pt)[]
+        {
+            ("G722", "G.722 (широкополосный)", 9),
+            ("PCMU", "G.711 μ-law", 0),
+            ("PCMA", "G.711 A-law", 8),
+            ("G729", "G.729 (сжатый)", 18),
+        };
+        var enabledSet = new HashSet<string>(_config.EnabledCodecs, StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, desc, pt) in allCodecs)
+            CodecOptions.Add(new CodecOption(name, desc, pt, enabledSet.Contains(name)));
 
         // Load history
         foreach (var record in _historyService.Load())
@@ -88,12 +108,27 @@ public partial class MainViewModel : ObservableObject
         // Create SIP service
         ILogger<SipService> logger = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance.CreateLogger<SipService>();
         _sipService = new SipService(logger);
+        _sipService.SetLoggingEnabled(SipLoggingEnabled);
 
         _sipService.RegistrationStateChanged += OnRegistrationStateChanged;
         _sipService.IncomingCall += OnIncomingCall;
         _sipService.CallStateChanged += OnCallStateChanged;
         _sipService.CallEnded += OnCallEnded;
+        _sipService.CallFailedWithReason += OnCallFailedWithReason;
         _sipService.ErrorOccurred += OnErrorOccurred;
+
+        // Auto-connect on startup if credentials are configured
+        if (!string.IsNullOrEmpty(Server) && !string.IsNullOrEmpty(Username))
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(500); // let the UI render first
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+                {
+                    await ConnectAsync();
+                });
+            });
+        }
     }
 
     private void LoadAudioDevices()
@@ -128,11 +163,7 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        _config.Server = Server;
-        _config.Port = Port;
-        _config.Username = Username;
-        _config.Password = Password;
-        _configService.SaveConfig(_config);
+        SaveConfigToService();
 
         StatusText = "Подключение...";
         StatusBrush = "#FFC107";
@@ -142,41 +173,16 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task CallAsync()
+    private async Task ReregisterAsync()
     {
-        if (string.IsNullOrEmpty(PhoneNumber)) return;
-        ActiveCallNumber = PhoneNumber;
-        await _sipService.MakeCallAsync(PhoneNumber);
+        if (!IsRegistered) return;
+
+        SaveConfigToService();
+        await _sipService.RegisterAsync();
+        _notificationService.ShowNotification("Перерегистрация", "Запрошена повторная регистрация", NotificationType.Info);
     }
 
-    [RelayCommand]
-    private void Hangup()
-    {
-        _sipService.HangupCall();
-    }
-
-    [RelayCommand]
-    private void Answer()
-    {
-        IsIncomingCall = false;
-        _sipService.AnswerCall();
-        _notificationService.PlayConnected();
-    }
-
-    [RelayCommand]
-    private void ToggleMute()
-    {
-        IsMuted = !IsMuted;
-    }
-
-    [RelayCommand]
-    private void ToggleSettings()
-    {
-        ShowSettings = !ShowSettings;
-    }
-
-    [RelayCommand]
-    private void SaveSettings()
+    private void SaveConfigToService()
     {
         _config.Server = Server;
         _config.Port = Port;
@@ -193,15 +199,78 @@ public partial class MainViewModel : ObservableObject
         _config.RtpPortMin = RtpPortMin;
         _config.RtpPortMax = RtpPortMax;
         _config.RegistrationExpiry = RegistrationExpiry;
-
+        _config.RingVolume = RingVolume;
+        _config.SipLoggingEnabled = SipLoggingEnabled;
+        _config.LocalPort = LocalPort;
         if (SelectedPlaybackDevice != null)
             _config.PlaybackDeviceId = SelectedPlaybackDevice.Index;
         if (SelectedCaptureDevice != null)
             _config.CaptureDeviceId = SelectedCaptureDevice.Index;
+        _config.EnabledCodecs = CodecOptions.Where(c => c.IsEnabled).Select(c => c.Name).ToList();
+        _sipService.UpdateConfig(_config);
+    }
 
+    [RelayCommand]
+    private async Task CallAsync()
+    {
+        if (string.IsNullOrEmpty(PhoneNumber)) return;
+        ActiveCallNumber = PhoneNumber;
+        _lastCallDirection = "out";
+        await _sipService.MakeCallAsync(PhoneNumber);
+    }
+
+    [RelayCommand]
+    private void Hangup()
+    {
+        if (IsIncomingCall)
+        {
+            _notificationService.CloseIncomingCallNotification();
+            IsIncomingCall = false;
+        }
+        _sipService.HangupCall();
+    }
+
+    [RelayCommand]
+    private void Answer()
+    {
+        _notificationService.CloseIncomingCallNotification();
+        IsIncomingCall = false;
+        _sipService.AnswerCall();
+        _notificationService.PlayConnected();
+    }
+
+    [RelayCommand]
+    private void ToggleMute()
+    {
+        IsMuted = !IsMuted;
+    }
+
+    [RelayCommand]
+    private void ToggleSettings()
+    {
+        var window = new Views.SettingsWindow
+        {
+            DataContext = this,
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        window.ShowDialog();
+    }
+
+    [RelayCommand]
+    private void SaveSettings()
+    {
+        SaveConfigToService();
         _configService.SaveConfig(_config);
+        _notificationService.SetRingVolume(RingVolume);
+        _sipService.SetLoggingEnabled(SipLoggingEnabled);
+
         _notificationService.ShowNotification("Сохранено", "Настройки обновлены", NotificationType.Success);
-        ShowSettings = false;
+
+        // Close settings window
+        var settingsWindow = System.Windows.Application.Current.Windows
+            .OfType<Views.SettingsWindow>()
+            .FirstOrDefault();
+        settingsWindow?.Close();
     }
 
     [RelayCommand]
@@ -210,6 +279,16 @@ public partial class MainViewModel : ObservableObject
         if (!IsInCall) return;
         TransferNumber = "";
         ShowTransferDialog = true;
+    }
+
+    [RelayCommand]
+    private void ShowAbout()
+    {
+        var about = new Views.AboutWindow
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        about.ShowDialog();
     }
 
     [RelayCommand]
@@ -244,106 +323,170 @@ public partial class MainViewModel : ObservableObject
 
     private void OnRegistrationStateChanged(int code, string reason)
     {
-        IsRegistered = (code >= 200 && code < 300);
-        StatusText = IsRegistered ? "Зарегистрирован" : $"Ошибка: {code} {reason}";
-        StatusBrush = IsRegistered ? "#4CAF50" : "#FF5252";
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            IsRegistered = (code >= 200 && code < 300);
+            StatusText = IsRegistered ? "Зарегистрирован" : $"Ошибка: {code} {reason}";
+            StatusBrush = IsRegistered ? "#4CAF50" : "#FF5252";
 
-        if (IsRegistered)
-            _notificationService.ShowNotification("Подключено", $"Регистрация на {Server} успешна", NotificationType.Success);
+            if (IsRegistered)
+                _notificationService.ShowNotification("Подключено", $"Регистрация на {Server} успешна", NotificationType.Success);
+        });
     }
 
     private void OnIncomingCall(string callId, string remoteUri)
     {
-        IsIncomingCall = true;
-        ActiveCallNumber = remoteUri;
-        StatusText = $"Входящий: {remoteUri}";
-
-        _notificationService.ShowIncomingCallNotification(
-            remoteUri,
-            onAnswer: () =>
-            {
-                IsIncomingCall = false;
-                _sipService.AnswerCall();
-                IsInCall = true;
-                _callStartTime = DateTime.Now;
-                _ = UpdateCallDuration();
-            },
-            onReject: () =>
-            {
-                IsIncomingCall = false;
-                _sipService.HangupCall();
-                var record = new CallRecord
-                {
-                    Number = remoteUri,
-                    Direction = "in",
-                    Status = "missed",
-                    Duration = 0,
-                    Timestamp = DateTime.Now
-                };
-                _historyService.Add(record);
-                CallHistory.Insert(0, record);
-                IsHistoryEmpty = false;
-            }
-        );
-
-        if (AutoAnswerEnabled)
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(AutoAnswerDelay * 1000);
-                if (IsIncomingCall)
+            IsIncomingCall = true;
+            ActiveCallNumber = remoteUri;
+            _lastCallDirection = "in";
+            StatusText = $"Входящий: {remoteUri}";
+
+            _notificationService.ShowIncomingCallNotification(
+                remoteUri,
+                onAnswer: () =>
                 {
                     IsIncomingCall = false;
                     _sipService.AnswerCall();
                     IsInCall = true;
                     _callStartTime = DateTime.Now;
                     _ = UpdateCallDuration();
+                },
+                onReject: () =>
+                {
+                    IsIncomingCall = false;
+                    _sipService.HangupCall();
+                    RecordCall(remoteUri, "in", "missed", 0);
                 }
-            });
-        }
+            );
+
+            if (AutoAnswerEnabled)
+            {
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(AutoAnswerDelay * 1000);
+                    if (IsIncomingCall)
+                    {
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            _notificationService.CloseIncomingCallNotification();
+                            IsIncomingCall = false;
+                            _sipService.AnswerCall();
+                            IsInCall = true;
+                            StatusText = $"Звонок: {ActiveCallNumber}";
+                            StatusBrush = "#4CAF50";
+                            _callStartTime = DateTime.Now;
+                            _ = UpdateCallDuration();
+                        });
+                    }
+                });
+            }
+        });
     }
 
     private void OnCallStateChanged(string callId, int state, string reason)
     {
-        if (state == 5)
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
-            IsInCall = true;
-            _callStartTime = DateTime.Now;
-            _ = UpdateCallDuration();
-            _notificationService.PlayConnected();
-        }
+            if (state == 5)
+            {
+                IsInCall = true;
+                _callStartTime = DateTime.Now;
+                _ = UpdateCallDuration();
+                _notificationService.PlayConnected();
+            }
+        });
     }
 
     private void OnCallEnded()
     {
-        IsInCall = false;
-        IsMuted = false;
-        CallDuration = "00:00";
-        _notificationService.StopSound();
-
-        if (_callStartTime.HasValue)
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
         {
-            var duration = (int)(DateTime.Now - _callStartTime.Value).TotalSeconds;
-            var record = new CallRecord
+            _notificationService.CloseIncomingCallNotification();
+            IsIncomingCall = false;
+
+            if (_callStartTime.HasValue)
             {
-                Number = ActiveCallNumber,
-                Direction = "out",
-                Status = "completed",
-                Duration = duration,
-                Timestamp = DateTime.Now
-            };
-            _historyService.Add(record);
-            CallHistory.Insert(0, record);
-            IsHistoryEmpty = false;
-            _callStartTime = null;
-        }
+                var duration = (int)(DateTime.Now - _callStartTime.Value).TotalSeconds;
+                RecordCall(ActiveCallNumber, _lastCallDirection, "completed", duration);
+                _callStartTime = null;
+            }
+
+            IsInCall = false;
+            IsMuted = false;
+            CallDuration = "00:00";
+            StatusText = IsRegistered ? "Зарегистрирован" : "Не зарегистрирован";
+            StatusBrush = IsRegistered ? "#4CAF50" : "#FF5252";
+        });
     }
+
+    private void OnCallFailedWithReason(string callId, string reason)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            _notificationService.CloseIncomingCallNotification();
+            IsIncomingCall = false;
+
+            var status = MapSipReason(reason);
+            if (_callStartTime.HasValue)
+            {
+                var duration = (int)(DateTime.Now - _callStartTime.Value).TotalSeconds;
+                RecordCall(ActiveCallNumber, _lastCallDirection, status, duration);
+                _callStartTime = null;
+            }
+            else
+            {
+                RecordCall(ActiveCallNumber, "out", status, 0);
+            }
+
+            IsInCall = false;
+            IsMuted = false;
+            CallDuration = "00:00";
+            StatusText = IsRegistered ? "Зарегистрирован" : "Не зарегистрирован";
+            StatusBrush = IsRegistered ? "#4CAF50" : "#FF5252";
+        });
+    }
+
+    private void RecordCall(string number, string direction, string status, int duration)
+    {
+        var record = new CallRecord
+        {
+            Number = number,
+            Direction = direction,
+            Status = status,
+            Duration = duration,
+            Timestamp = DateTime.Now
+        };
+        _historyService.Add(record);
+        CallHistory.Insert(0, record);
+        IsHistoryEmpty = false;
+    }
+
+    private static string MapSipReason(string reason)
+    {
+        return reason.ToLowerInvariant() switch
+        {
+            var r when r.Contains("busy") => "busy",
+            var r when r.Contains("not found") => "failed",
+            var r when r.Contains("decline") || r.Contains("reject") => "rejected",
+            var r when r.Contains("timeout") || r.Contains("no response") => "no_answer",
+            var r when r.Contains("cancel") => "no_answer",
+            var r when r.Contains("terminated") => "completed",
+            _ => "failed"
+        };
+    }
+
+    private string _lastCallDirection = "out";
 
     private void OnErrorOccurred(string error)
     {
-        StatusText = $"Ошибка: {error}";
-        StatusBrush = "#FF5252";
-        _notificationService.ShowNotification("Ошибка", error, NotificationType.Error);
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            StatusText = $"Ошибка: {error}";
+            StatusBrush = "#FF5252";
+            _notificationService.ShowNotification("Ошибка", error, NotificationType.Error);
+        });
     }
 
     private async Task UpdateCallDuration()
@@ -356,13 +499,15 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnMicVolumeChanged(int value)
+    partial void OnMicVolumeChanged(double value)
     {
         _config.MicVolume = value;
+        _sipService?.SetMicVolume(value);
     }
 
-    partial void OnSpeakerVolumeChanged(int value)
+    partial void OnSpeakerVolumeChanged(double value)
     {
         _config.SpeakerVolume = value;
+        _sipService?.SetSpeakerVolume(value);
     }
 }

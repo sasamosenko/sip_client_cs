@@ -1,5 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media.Imaging;
+using SipClient.Models;
 
 namespace SipClient.Views;
 
@@ -8,62 +11,49 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        PasswordBox.PasswordChanged += PasswordBox_PasswordChanged;
+        LoadIcon();
     }
 
-    private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    private void LoadIcon()
     {
-        if (DataContext is ViewModels.MainViewModel vm)
+        try
         {
-            vm.Password = PasswordBox.Password;
+            var uri = new Uri("pack://application:,,,/SipClient;component/Resources/phone.ico", UriKind.Absolute);
+            Icon = new BitmapImage(uri);
         }
-    }
-
-    private void PasswordToggle_Click(object sender, RoutedEventArgs e)
-    {
-        if (PasswordToggle.IsChecked == true)
+        catch
         {
-            // Show password as plain text
-            var pwd = PasswordBox.Password;
-            PasswordBox.Visibility = Visibility.Collapsed;
-
-            var tb = new TextBox
+            try
             {
-                Text = pwd,
-                Padding = new Thickness(12, 10, 12, 10),
-                FontSize = 14,
-                Background = (System.Windows.Media.Brush)FindResource("SurfaceCardBrush"),
-                Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush"),
-                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x58, 0x58, 0x78)),
-                BorderThickness = new Thickness(1),
-                VerticalContentAlignment = VerticalAlignment.Center,
-                Tag = "PasswordBoxReplacement"
-            };
-            tb.TextChanged += (s, args) =>
-            {
-                if (DataContext is ViewModels.MainViewModel vm2)
-                    vm2.Password = tb.Text;
-            };
-
-            var grid = (Grid)PasswordBox.Parent;
-            grid.Children.Add(tb);
-            Grid.SetColumn(tb, 0);
-        }
-        else
-        {
-            // Hide password, restore PasswordBox
-            var grid = (Grid)PasswordBox.Parent;
-            var tb = grid.Children
-                .OfType<Control>()
-                .FirstOrDefault(c => c.Tag?.ToString() == "PasswordBoxReplacement") as TextBox;
-
-            if (tb != null)
-            {
-                PasswordBox.Password = tb.Text;
-                grid.Children.Remove(tb);
+                var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "phone.ico");
+                if (System.IO.File.Exists(path))
+                    Icon = new BitmapImage(new Uri(path, UriKind.Absolute));
             }
+            catch { }
+        }
+    }
 
-            PasswordBox.Visibility = Visibility.Visible;
+    private void PhoneNumber_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.CallCommand.Execute(null);
+        }
+    }
+
+    private void CopyCallRecord_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.Tag is CallRecord record)
+            record.CopyToClipboard();
+    }
+
+    private void CallHistory_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
+            && sender is ListBox lb && lb.SelectedItem is CallRecord record)
+        {
+            record.CopyToClipboard();
+            e.Handled = true;
         }
     }
 }

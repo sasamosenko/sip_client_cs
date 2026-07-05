@@ -1,58 +1,68 @@
 using System.Media;
 using System.Windows;
 using System.Windows.Threading;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 
 namespace SipClient.Services;
 
 public class NotificationService
 {
     private readonly Dispatcher _dispatcher;
-    private SoundPlayer? _ringPlayer;
-    private SoundPlayer? _busyPlayer;
-    
+    private WaveOutEvent? _ringOutput;
+    private bool _ringing;
+    private double _ringVolumePercent = 80;
+    private Window? _incomingCallWindow;
+
     public NotificationService()
     {
         _dispatcher = Dispatcher.CurrentDispatcher;
-        LoadSounds();
     }
-    
-    private void LoadSounds()
+
+    public void SetRingVolume(double percent)
     {
-        try
-        {
-            // Use system sounds as fallback
-            _ringPlayer = null;
-            _busyPlayer = null;
-        }
-        catch { }
+        _ringVolumePercent = percent;
     }
-    
+
     public void PlayRing()
     {
+        if (_ringing) return;
+        _ringing = true;
+
         _dispatcher.Invoke(() =>
         {
             try
             {
-                SystemSounds.Beep.Play();
+                var ring = new RingPatternProvider(44100, _ringVolumePercent / 100.0);
+
+                _ringOutput = new WaveOutEvent();
+                _ringOutput.Init(ring);
+                _ringOutput.Play();
             }
-            catch { }
+            catch
+            {
+                _ringing = false;
+            }
         });
     }
-    
+
     public void PlayBusy()
     {
+        StopSound();
         _dispatcher.Invoke(() =>
         {
             try
             {
+                using var player = new System.Media.SoundPlayer();
                 SystemSounds.Exclamation.Play();
             }
             catch { }
         });
     }
-    
+
     public void PlayConnected()
     {
+        StopSound();
         _dispatcher.Invoke(() =>
         {
             try
@@ -62,12 +72,19 @@ public class NotificationService
             catch { }
         });
     }
-    
+
     public void StopSound()
     {
-        // Stop any playing sound
+        _ringing = false;
+        try
+        {
+            _ringOutput?.Stop();
+            _ringOutput?.Dispose();
+            _ringOutput = null;
+        }
+        catch { }
     }
-    
+
     public void ShowNotification(string title, string message, NotificationType type = NotificationType.Info)
     {
         _dispatcher.Invoke(() =>
@@ -86,7 +103,7 @@ public class NotificationService
                 Left = SystemParameters.PrimaryScreenWidth - 340,
                 Top = 40
             };
-            
+
             var bg = type switch
             {
                 NotificationType.Success => "#4CAF50",
@@ -94,15 +111,15 @@ public class NotificationService
                 NotificationType.Warning => "#FFC107",
                 _ => "#6C63FF"
             };
-            
+
             var icon = type switch
             {
-                NotificationType.Success => "✓",
-                NotificationType.Error => "✕",
-                NotificationType.Warning => "⚠",
-                _ => "ℹ"
+                NotificationType.Success => "\u2713",
+                NotificationType.Error => "\u2715",
+                NotificationType.Warning => "\u26A0",
+                _ => "\u2139"
             };
-            
+
             notification.Content = new System.Windows.Controls.Border
             {
                 Background = new System.Windows.Media.SolidColorBrush(
@@ -132,8 +149,7 @@ public class NotificationService
                     }
                 }
             };
-            
-            // Auto-close after 3 seconds
+
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             timer.Tick += (s, e) =>
             {
@@ -141,14 +157,12 @@ public class NotificationService
                 notification.Close();
             };
             timer.Start();
-            
-            // Click to close
+
             notification.MouseLeftButtonDown += (s, e) => notification.Close();
-            
             notification.Show();
         });
     }
-    
+
     public void ShowIncomingCallNotification(string callerNumber, Action onAnswer, Action onReject)
     {
         _dispatcher.Invoke(() =>
@@ -167,10 +181,10 @@ public class NotificationService
                 Left = SystemParameters.PrimaryScreenWidth - 380,
                 Top = 40
             };
-            
+
             var answerBtn = new System.Windows.Controls.Button
             {
-                Content = "📞 Ответить",
+                Content = "\U0001F4DE \u041E\u0442\u0432\u0435\u0442\u0438\u0442\u044C",
                 FontSize = 13,
                 FontWeight = System.Windows.FontWeights.SemiBold,
                 Foreground = System.Windows.Media.Brushes.White,
@@ -180,11 +194,16 @@ public class NotificationService
                 Cursor = System.Windows.Input.Cursors.Hand,
                 Margin = new System.Windows.Thickness(0, 0, 8, 0)
             };
-            answerBtn.Click += (s, e) => { onAnswer(); notification.Close(); };
-            
+            answerBtn.Click += (s, e) =>
+            {
+                StopSound();
+                onAnswer();
+                notification.Close();
+            };
+
             var rejectBtn = new System.Windows.Controls.Button
             {
-                Content = "✕ Отклонить",
+                Content = "\u2715 \u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C",
                 FontSize = 13,
                 FontWeight = System.Windows.FontWeights.SemiBold,
                 Foreground = System.Windows.Media.Brushes.White,
@@ -193,8 +212,13 @@ public class NotificationService
                 Padding = new System.Windows.Thickness(16, 8, 16, 8),
                 Cursor = System.Windows.Input.Cursors.Hand
             };
-            rejectBtn.Click += (s, e) => { onReject(); notification.Close(); };
-            
+            rejectBtn.Click += (s, e) =>
+            {
+                StopSound();
+                onReject();
+                notification.Close();
+            };
+
             notification.Content = new System.Windows.Controls.Border
             {
                 Background = new System.Windows.Media.SolidColorBrush(
@@ -210,7 +234,7 @@ public class NotificationService
                     {
                         new System.Windows.Controls.TextBlock
                         {
-                            Text = "📞 Входящий звонок",
+                            Text = "\U0001F4DE \u0412\u0445\u043E\u0434\u044F\u0449\u0438\u0439 \u0437\u0432\u043E\u043D\u043E\u043A",
                             FontSize = 14,
                             FontWeight = System.Windows.FontWeights.SemiBold,
                             Foreground = System.Windows.Media.Brushes.White,
@@ -234,11 +258,27 @@ public class NotificationService
                     }
                 }
             };
-            
+
+            notification.Closed += (s, e) => { StopSound(); _incomingCallWindow = null; };
+
+            _incomingCallWindow = notification;
             PlayRing();
-            
             notification.Show();
         });
+    }
+
+    public void CloseIncomingCallNotification()
+    {
+        StopSound();
+        try
+        {
+            if (_incomingCallWindow != null)
+            {
+                _incomingCallWindow.Close();
+                _incomingCallWindow = null;
+            }
+        }
+        catch { }
     }
 }
 
@@ -248,4 +288,50 @@ public enum NotificationType
     Success,
     Warning,
     Error
+}
+
+/// <summary>
+/// Generates a repeating ring pattern: 1s tone, 2s silence
+/// </summary>
+internal class RingPatternProvider : ISampleProvider
+{
+    private readonly float _sampleRate;
+    private readonly float _volume;
+    private int _position;
+    private const int ToneSamples = 44100;     // 1 second of tone
+    private const int SilenceSamples = 88200;   // 2 seconds of silence
+    private const int CycleSamples = ToneSamples + SilenceSamples; // 3 seconds total
+
+    public WaveFormat WaveFormat { get; }
+
+    public RingPatternProvider(float sampleRate, double volume01)
+    {
+        _sampleRate = sampleRate;
+        _volume = (float)Math.Clamp(volume01, 0.0, 1.0);
+        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat((int)sampleRate, 1);
+    }
+
+    public int Read(float[] buffer, int offset, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            int posInCycle = (_position + i) % CycleSamples;
+
+            if (posInCycle < ToneSamples)
+            {
+                // During tone: 440Hz sine with slight amplitude modulation
+                double t = (double)posInCycle / _sampleRate;
+                buffer[offset + i] = (float)(0.3 * _volume * Math.Sin(2 * Math.PI * 440 * t)
+                                           * (0.7 + 0.3 * Math.Sin(2 * Math.PI * 0.5 * t)));
+            }
+            else
+            {
+                // During silence
+                buffer[offset + i] = 0f;
+            }
+        }
+
+        _position += count;
+        return count;
+    }
 }

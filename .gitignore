@@ -1,8 +1,28 @@
+# Build output
 bin/
 obj/
 dist/
-ApiCheck/
+
+# IDE
 .vs/
+.vscode/
 .idea/
 *.user
 *.suo
+*.sln.docstates
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Runtime / user data
+logs/
+*.log
+config.json
+call_history.csv
+*.pcap
+dumps/
+
+# MiMoCode
+.mimocode/

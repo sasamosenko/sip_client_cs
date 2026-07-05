@@ -23,6 +23,15 @@ public class SipService
     private SIPServerUserAgent? _pendingIncomingCall;
     private VoIPMediaSession? _rtpSession;
     private SipConfig _config;
+    private double _micVolume = 100;
+    private double _speakerVolume = 100;
+    private int _lastLoggedMic = -1;
+    private int _lastLoggedSpeaker = -1;
+    private bool _hangupInProgress;
+    private bool _callEndedFired;
+
+    // Stored dialogue info for sending BYE even after agent cleanup
+    private SIPDialogue? _activeDialogue;
 
     public bool IsRegistered => _registrar != null;
     public bool IsInCall => _userAgent?.IsCallActive == true;
@@ -32,6 +41,7 @@ public class SipService
     public event Action<string, string>? IncomingCall;
     public event Action<string, int, string>? CallStateChanged;
     public event Action? CallEnded;
+    public event Action<string, string>? CallFailedWithReason;
     public event Action<string>? ErrorOccurred;
 
     public SipService(ILogger<SipService> logger)
@@ -39,6 +49,33 @@ public class SipService
         _logger = logger;
         _sipLogger = new SipLogger();
         _config = new SipConfig();
+    }
+
+    public void SetMicVolume(double percent)
+    {
+        _micVolume = percent;
+        var rounded = (int)Math.Round(percent);
+        if (Math.Abs(_lastLoggedMic - rounded) >= 1)
+        {
+            _lastLoggedMic = rounded;
+            _sipLogger.LogEvent($"Mic volume set to {rounded}%");
+        }
+    }
+
+    public void SetSpeakerVolume(double percent)
+    {
+        _speakerVolume = percent;
+        var rounded = (int)Math.Round(percent);
+        if (Math.Abs(_lastLoggedSpeaker - rounded) >= 1)
+        {
+            _lastLoggedSpeaker = rounded;
+            _sipLogger.LogEvent($"Speaker volume set to {rounded}%");
+        }
+    }
+
+    public void SetLoggingEnabled(bool enabled)
+    {
+        _sipLogger.Enabled = enabled;
     }
 
     public static List<AudioDeviceInfo> GetPlaybackDevices()
@@ -67,16 +104,57 @@ public class SipService
     {
         _config = config;
 
+        // Cleanup old transport
+        try
+        {
+            if (_sipTransport != null)
+            {
+                _sipTransport.SIPTransportRequestReceived -= OnSipRequestReceived;
+                try { _sipTransport.Shutdown(); } catch { }
+                _sipTransport = null;
+            }
+        }
+        catch { }
+
         try
         {
             _sipTransport = new SIPTransport();
-            var udpEndPoint = new IPEndPoint(IPAddress.Any, config.Port);
-            _sipTransport.AddSIPChannel(new SIPUDPChannel(udpEndPoint));
+
+            // Try specified port, fallback to OS-assigned port
+            IPEndPoint udpEndPoint;
+            try
+            {
+                udpEndPoint = new IPEndPoint(IPAddress.Any, config.LocalPort);
+                _sipTransport.AddSIPChannel(new SIPUDPChannel(udpEndPoint));
+            }
+            catch
+            {
+                udpEndPoint = new IPEndPoint(IPAddress.Any, 0);
+                _sipTransport.AddSIPChannel(new SIPUDPChannel(udpEndPoint));
+            }
 
             _sipTransport.SIPTransportRequestReceived += OnSipRequestReceived;
+            _sipTransport.SIPTransportResponseReceived += OnSipResponseReceived;
 
-            _sipLogger.LogEvent($"SIP transport started on port {config.Port}");
-            _logger.LogInformation("SIP transport started on port {Port}", config.Port);
+            HookSdpFiltering();
+
+            // SIP packet dumps — trace events capture ALL traffic (sent + received)
+            _sipTransport.SIPRequestInTraceEvent += (local, remote, req) =>
+                _sipLogger.LogReceived(req.ToString());
+            _sipTransport.SIPRequestOutTraceEvent += (local, remote, req) =>
+                _sipLogger.LogSent(req.ToString());
+            _sipTransport.SIPResponseInTraceEvent += (local, remote, resp) =>
+                _sipLogger.LogReceived(resp.ToString());
+            _sipTransport.SIPResponseOutTraceEvent += (local, remote, resp) =>
+                _sipLogger.LogSent(resp.ToString());
+            _sipTransport.SIPBadRequestInTraceEvent += (local, remote, msg, _, raw) =>
+                _sipLogger.LogError($"Bad request from {remote}: {msg}\n{raw}");
+            _sipTransport.SIPBadResponseInTraceEvent += (local, remote, msg, _, raw) =>
+                _sipLogger.LogError($"Bad response from {remote}: {msg}\n{raw}");
+
+            var actualPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            _sipLogger.LogEvent($"SIP transport started on port {actualPort}");
+            _logger.LogInformation("SIP transport started on port {Port}", actualPort);
         }
         catch (Exception ex)
         {
@@ -86,53 +164,72 @@ public class SipService
         }
     }
 
+    public void UpdateConfig(SipConfig config)
+    {
+        _config = config;
+    }
+
     public async Task RegisterAsync()
     {
-        if (_sipTransport == null) return;
+        if (_sipTransport == null)
+        {
+            _sipLogger.LogError("RegisterAsync: transport is null");
+            return;
+        }
+
+        // Cleanup old registrar
+        _registrar = null;
 
         try
         {
             var domain = string.IsNullOrEmpty(_config.Domain) ? _config.Server : _config.Domain;
             var authUser = string.IsNullOrEmpty(_config.AuthUsername) ? _config.Username : _config.AuthUsername;
             var sipAOR = SIPURI.ParseSIPURI($"sip:{_config.Username}@{domain}");
-            var contactURI = SIPURI.ParseSIPURI($"sip:{_config.Username}@{_config.Server}:{_config.Port}");
+            var contactURI = SIPURI.ParseSIPURI($"sip:{_config.Username}@{_config.Server}:{_config.LocalPort}");
+            var registrarHost = _config.Server + (_config.Port != 5060 ? $":{_config.Port}" : "");
+
+            _sipLogger.LogEvent($"RegisterAsync: AOR={sipAOR}, Contact={contactURI}, Server={registrarHost}, AuthUser={authUser}, Domain={domain}");
 
             _registrar = new SIPRegistrationUserAgent(
                 _sipTransport,
-                null,
-                sipAOR,
-                authUser,
-                _config.Password,
-                domain,
-                _config.Server,
-                contactURI,
+                null,                   // outboundProxy
+                sipAOR,                 // sipAccountAOR: sip:502@127.0.0.1
+                authUser,               // authUsername
+                _config.Password,       // password
+                domain,                 // realm
+                registrarHost,          // registrarHost
+                contactURI,             // contactURI: sip:502@127.0.0.1:5080
                 _config.RegistrationExpiry,
-                null,
-                maxRegistrationAttemptTimeout: 15,
-                registerFailureRetryInterval: 10,
-                maxRegisterAttempts: 0,
-                exitOnUnequivocalFailure: false
+                null,                   // customHeaders
+                60,                     // maxRegistrationAttemptTimeout
+                300,                    // registerFailureRetryInterval
+                3,                      // maxRegisterAttempts
+                false                   // exitOnUnequivocalFailure
             );
 
-            _registrar.RegistrationSuccessful += (uri) =>
+            _registrar.UserDisplayName = _config.DisplayName;
+            _registrar.UserAgent = "SipClient/" + SipVersion.String;
+
+            _registrar.RegistrationSuccessful += (uri, rsp) =>
             {
                 _sipLogger.LogEvent($"Registration successful: {uri}");
                 RegistrationStateChanged?.Invoke(200, "OK");
             };
 
-            _registrar.RegistrationFailed += (uri, err) =>
+            _registrar.RegistrationFailed += (uri, rsp, err) =>
             {
                 _sipLogger.LogError($"Registration failed: {uri} - {err}");
                 RegistrationStateChanged?.Invoke(403, err);
             };
 
-            _registrar.RegistrationTemporaryFailure += (uri, msg) =>
+            _registrar.RegistrationTemporaryFailure += (uri, rsp, msg) =>
             {
                 _sipLogger.LogEvent($"Registration temp failure: {uri} - {msg}");
                 RegistrationStateChanged?.Invoke(503, msg);
             };
 
             _registrar.Start();
+            _sipLogger.LogEvent($"Registration started to {registrarHost}");
             _logger.LogInformation("Registration initiated to {Server}:{Port}", _config.Server, _config.Port);
         }
         catch (Exception ex)
@@ -148,27 +245,130 @@ public class SipService
         var inIdx = _config.CaptureDeviceId >= 0 ? _config.CaptureDeviceId : 0;
 
         var audioEndPoint = new WindowsAudioEndPoint(new AudioEncoder(), outIdx, inIdx, false, false);
-        var mediaEndPoints = new MediaEndPoints
-        {
-            AudioSink = audioEndPoint,
-            AudioSource = audioEndPoint,
-        };
-
-        var session = new VoIPMediaSession(mediaEndPoints);
+        var session = new VoIPMediaSession(audioEndPoint.ToMediaEndPoints());
         session.AcceptRtpFromAny = true;
         return session;
     }
 
+    // Codec payload types: name -> payload number
+    private static readonly Dictionary<string, int> CodecPayloadMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["PCMU"] = 0,
+        ["PCMA"] = 8,
+        ["G722"] = 9,
+        ["G729"] = 18,
+        ["telephone-event"] = 101
+    };
+
+    private string FilterSdpCodecs(string sdp)
+    {
+        var enabled = _config.EnabledCodecs;
+        if (enabled == null || enabled.Count == 0) return sdp;
+
+        var enabledPayloads = new HashSet<int>();
+        foreach (var codec in enabled)
+        {
+            if (CodecPayloadMap.TryGetValue(codec, out var pt))
+                enabledPayloads.Add(pt);
+        }
+        // Always keep telephone-event
+        enabledPayloads.Add(101);
+
+        var lines = sdp.Split(["\r\n", "\n"], StringSplitOptions.None);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].StartsWith("m=audio", StringComparison.OrdinalIgnoreCase))
+            {
+                // Parse: m=audio <port> RTP/AVP <pt1> <pt2> ...
+                var parts = lines[i].Split(' ');
+                if (parts.Length > 3)
+                {
+                    var kept = new List<string> { parts[0], parts[1], parts[2] };
+                    for (int j = 3; j < parts.Length; j++)
+                    {
+                        if (int.TryParse(parts[j], out var pt) && enabledPayloads.Contains(pt))
+                            kept.Add(parts[j]);
+                    }
+                    lines[i] = string.Join(" ", kept);
+                }
+            }
+            else if (lines[i].StartsWith("a=rtpmap:", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract payload type from "a=rtpmap:<pt> <codec>/<rate>"
+                var afterColon = lines[i].Substring(9);
+                var spaceIdx = afterColon.IndexOf(' ');
+                if (spaceIdx > 0 && int.TryParse(afterColon.Substring(0, spaceIdx), out var pt))
+                {
+                    if (!enabledPayloads.Contains(pt))
+                    {
+                        lines[i] = ""; // remove this line
+                    }
+                }
+            }
+            else if (lines[i].StartsWith("a=fmtp:", StringComparison.OrdinalIgnoreCase))
+            {
+                var afterColon = lines[i].Substring(7);
+                var spaceIdx = afterColon.IndexOf(' ');
+                if (spaceIdx > 0 && int.TryParse(afterColon.Substring(0, spaceIdx), out var pt))
+                {
+                    if (!enabledPayloads.Contains(pt))
+                    {
+                        lines[i] = "";
+                    }
+                }
+            }
+        }
+
+        var result = string.Join("\r\n", lines.Where(l => l != ""));
+        return result;
+    }
+
+    private void HookSdpFiltering()
+    {
+        if (_sipTransport == null) return;
+
+        _sipTransport.SIPRequestOutTraceEvent += (local, remote, req) =>
+        {
+            if (req.Body != null && req.Body.Contains("m=audio"))
+            {
+                req.Body = FilterSdpCodecs(req.Body);
+            }
+        };
+
+        _sipTransport.SIPResponseOutTraceEvent += (local, remote, resp) =>
+        {
+            if (resp.Body != null && resp.Body.Contains("m=audio"))
+            {
+                resp.Body = FilterSdpCodecs(resp.Body);
+            }
+        };
+    }
+
     public async Task MakeCallAsync(string number)
     {
-        if (_sipTransport == null) { ErrorOccurred?.Invoke("Транспорт не запущен"); return; }
-        if (!IsRegistered) { ErrorOccurred?.Invoke("Не зарегистрирован"); return; }
-        if (IsInCall) { ErrorOccurred?.Invoke("Уже в звонке"); return; }
+        if (_sipTransport == null)
+        {
+            _sipLogger.LogError($"MakeCall failed: _sipTransport is null (registered={IsRegistered})");
+            ErrorOccurred?.Invoke("Транспорт не запущен");
+            return;
+        }
+        if (!IsRegistered)
+        {
+            _sipLogger.LogError("MakeCall failed: not registered");
+            ErrorOccurred?.Invoke("Не зарегистрирован");
+            return;
+        }
+        if (IsInCall)
+        {
+            ErrorOccurred?.Invoke("Уже в звонке");
+            return;
+        }
 
         try
         {
-            var callUri = SIPURI.ParseSIPURIRelaxed($"{number}@{_config.Server}");
             CurrentCallId = Guid.NewGuid().ToString("N");
+            _hangupInProgress = false;
+            _callEndedFired = false;
 
             _rtpSession = CreateMediaSession();
 
@@ -179,28 +379,30 @@ public class SipService
             _userAgent.ClientCallFailed += OnCallFailed;
             _userAgent.OnCallHungup += OnCallHungup;
 
-            var fromHeader = new SIPFromHeader(null, new SIPURI(_config.Username, _config.Server, null), null);
+            var callUri = $"sip:{number}@{_config.Server}";
+            var fromUri = $"sip:{_config.Username}@{_config.Server}";
             var callDescriptor = new SIPCallDescriptor(
                 _config.Username,
                 _config.Password,
-                callUri.ToString(),
-                fromHeader.ToString(),
-                null,
-                null,
-                null,
-                null,
+                callUri,
+                fromUri,
+                null,               // to
+                null,               // routeSet
+                null,               // customHeaders
+                _config.Username,   // authUsername
                 SIPCallDirection.Out,
-                SDP.SDP_MIME_CONTENTTYPE,
-                null,
-                null
+                "application/sdp",
+                null,               // content
+                null                // mangleIPAddress
             );
+            callDescriptor.FromDisplayName = _config.DisplayName;
 
             _sipLogger.LogEvent($"Calling {number}");
             await _userAgent.InitiateCallAsync(callDescriptor, _rtpSession, 120);
         }
         catch (Exception ex)
         {
-            _sipLogger.LogError($"Make call failed: {ex.Message}");
+            _sipLogger.LogError($"Make call failed: {ex}\n");
             ErrorOccurred?.Invoke(ex.Message);
             CleanupCall();
         }
@@ -256,23 +458,26 @@ public class SipService
         CallStateChanged?.Invoke(CurrentCallId!, 3, "Ringing");
     }
 
-    private async void OnCallAnswered(ISIPClientUserAgent uac, SIPResponse sipResponse)
+    private void OnCallAnswered(ISIPClientUserAgent uac, SIPResponse sipResponse)
     {
         _sipLogger.LogEvent($"Call answered: {sipResponse.StatusCode} {sipResponse.ReasonPhrase}");
+        _activeDialogue = _userAgent?.Dialogue;
         CallStateChanged?.Invoke(CurrentCallId!, 5, "OK");
     }
 
     private void OnCallFailed(ISIPClientUserAgent uac, string errorMessage, SIPResponse failureResponse)
     {
-        _sipLogger.LogError($"Call failed: {errorMessage}");
-        ErrorOccurred?.Invoke(errorMessage);
+        var reason = failureResponse?.ReasonPhrase ?? errorMessage;
+        _sipLogger.LogError($"Call failed: {reason}");
+        CallFailedWithReason?.Invoke(CurrentCallId ?? "", reason);
         CleanupCall();
-        CallEnded?.Invoke();
     }
 
     private void OnCallHungup(SIPDialogue? dialogue)
     {
         _sipLogger.LogEvent("Call hungup");
+        if (_callEndedFired) return;
+        _callEndedFired = true;
         CleanupCall();
         CallEnded?.Invoke();
     }
@@ -285,6 +490,8 @@ public class SipService
 
         try
         {
+            _callEndedFired = false;
+            _hangupInProgress = false;
             _rtpSession = CreateMediaSession();
             _userAgent.OnCallHungup += OnCallHungup;
             _ = _userAgent.Answer(_pendingIncomingCall, _rtpSession);
@@ -299,6 +506,9 @@ public class SipService
 
     public void HangupCall()
     {
+        if (_hangupInProgress) return;
+        _hangupInProgress = true;
+
         _sipLogger.LogEvent("Hangup");
 
         if (_userAgent != null)
@@ -308,15 +518,68 @@ public class SipService
             else
                 _userAgent.Cancel();
         }
+        else if (_activeDialogue != null && _sipTransport != null)
+        {
+            // Agent is gone but dialogue still exists — send BYE manually
+            _sipLogger.LogEvent("Sending BYE via stored dialogue");
+            var byeRequest = _activeDialogue.GetInDialogRequest(SIPMethodsEnum.BYE);
+            var byeTransaction = new SIPNonInviteTransaction(_sipTransport, byeRequest, _activeDialogue.RemoteSIPEndPoint);
+            byeTransaction.SendRequest();
+        }
 
         _pendingIncomingCall?.Reject(SIPResponseStatusCodesEnum.BusyHere, null, null);
-        CleanupCall();
+
+        if (!_callEndedFired)
+        {
+            _callEndedFired = true;
+            CleanupCall();
+            CallEnded?.Invoke();
+        }
+        else
+        {
+            CleanupCall();
+        }
+    }
+
+    private Task OnSipResponseReceived(SIPEndPoint localSIPEndPoint, SIPEndPoint remoteEndPoint, SIPResponse sipResponse)
+    {
+        _sipLogger.LogEvent($"Response from {remoteEndPoint}: {sipResponse.StatusCode} {sipResponse.ReasonPhrase}");
+        return Task.CompletedTask;
     }
 
     private Task OnSipRequestReceived(SIPEndPoint localSIPEndPoint, SIPEndPoint remoteEndPoint, SIPRequest sipRequest)
     {
         if (sipRequest.Method == SIPMethodsEnum.INVITE)
         {
+            var replacesHeader = sipRequest.Header.Replaces;
+            var fromName = sipRequest.Header.From?.FromName;
+            var fromUser = sipRequest.Header.From?.FromURI?.User;
+            var remoteUri = !string.IsNullOrEmpty(fromUser) && fromUser != "anonymous"
+                ? fromUser
+                : fromName ?? remoteEndPoint.ToString();
+            var callId = sipRequest.Header.CallId ?? Guid.NewGuid().ToString("N");
+
+            // Replaces = transfer: drop old call, accept new one
+            if (replacesHeader != null)
+            {
+                _sipLogger.LogEvent($"INVITE with Replaces — transfer from {remoteUri}");
+
+                // Close old media session first
+                try { _rtpSession?.Close("replaces"); } catch { }
+                _rtpSession = null;
+
+                // Accept the new call
+                if (_userAgent == null)
+                    _userAgent = new SIPUserAgent(_sipTransport!, null);
+
+                _pendingIncomingCall = _userAgent.AcceptCall(sipRequest);
+                CurrentCallId = callId;
+
+                _sipLogger.LogEvent($"Transfer call accepted: {remoteUri}");
+                IncomingCall?.Invoke(callId, remoteUri);
+                return Task.CompletedTask;
+            }
+
             if (IsInCall)
             {
                 var busyResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.BusyHere, null);
@@ -324,10 +587,9 @@ public class SipService
                 return Task.CompletedTask;
             }
 
-            var remoteUri = sipRequest.Header.From?.FromURI?.User ?? remoteEndPoint.ToString();
-            var callId = sipRequest.Header.CallId ?? Guid.NewGuid().ToString("N");
-
             _sipLogger.LogEvent($"Incoming call from {remoteUri}");
+
+            CleanupCall();
 
             if (_userAgent == null)
                 _userAgent = new SIPUserAgent(_sipTransport!, null);
@@ -340,12 +602,37 @@ public class SipService
         }
         else if (sipRequest.Method == SIPMethodsEnum.BYE)
         {
-            var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
-            _ = _sipTransport!.SendResponseAsync(okResponse);
+            _sipLogger.LogEvent("BYE received from remote");
 
-            _sipLogger.LogEvent("Call hungup by remote");
-            CleanupCall();
-            CallEnded?.Invoke();
+            // SIPUserAgent handles BYE internally (sends 200 OK) but OnCallHungup
+            // doesn't always fire for outgoing calls. Poll IsCallActive to clean up UI.
+            _ = Task.Run(async () =>
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    await Task.Delay(200);
+                    if (_callEndedFired) return;
+                    var agent = _userAgent;
+                    if (agent == null || !agent.IsCallActive)
+                    {
+                        _sipLogger.LogEvent("Remote BYE processed — cleaning up UI");
+                        if (!_callEndedFired)
+                        {
+                            _callEndedFired = true;
+                            CleanupCall();
+                            CallEnded?.Invoke();
+                        }
+                        return;
+                    }
+                }
+                if (!_callEndedFired)
+                {
+                    _sipLogger.LogEvent("Remote BYE: agent still active after 2s, forcing cleanup");
+                    _callEndedFired = true;
+                    CleanupCall();
+                    CallEnded?.Invoke();
+                }
+            });
         }
         else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
         {
@@ -358,10 +645,16 @@ public class SipService
 
     private void CleanupCall()
     {
-        _rtpSession?.Close("hangup");
+        try
+        {
+            _rtpSession?.Close("cleanup");
+        }
+        catch { }
         _rtpSession = null;
         _userAgent = null;
         _pendingIncomingCall = null;
+        _hangupInProgress = false;
+        _activeDialogue = null;
         CurrentCallId = null;
     }
 
