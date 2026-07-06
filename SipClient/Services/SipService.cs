@@ -1064,11 +1064,43 @@ public class SipService
                 CleanupCall();
             }
         }
-        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER || sipRequest.Method == SIPMethodsEnum.NOTIFY)
+        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
         {
-            _sipLogger.LogEvent($"{sipRequest.Method} received — sending 200 OK");
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
+        }
+        else if (sipRequest.Method == SIPMethodsEnum.NOTIFY)
+        {
+            // Always send 200 OK for NOTIFY
+            var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
+            _ = _sipTransport!.SendResponseAsync(okResponse);
+
+            // Check if this is a transfer completion notification
+            var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
+            if (subscriptionState.Contains("terminated"))
+            {
+                _sipLogger.LogEvent("Transfer completed (NOTIFY terminated) — hanging up");
+                // Send BYE to disconnect after successful transfer
+                if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
+                {
+                    SendByeForManualCall();
+                    CleanupManualCall();
+                }
+                else if (_userAgent != null && _userAgent.IsCallActive)
+                {
+                    _userAgent.Hangup();
+                }
+
+                if (!_callEndedFired)
+                {
+                    _callEndedFired = true;
+                    CallEnded?.Invoke();
+                }
+            }
+            else
+            {
+                _sipLogger.LogEvent($"NOTIFY received (state: {subscriptionState}) — acknowledged");
+            }
         }
 
         return Task.CompletedTask;
