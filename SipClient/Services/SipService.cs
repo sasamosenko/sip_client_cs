@@ -1010,9 +1010,35 @@ public class SipService
                 CleanupCall();
             }
         }
-        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER || sipRequest.Method == SIPMethodsEnum.NOTIFY)
+        else if (sipRequest.Method == SIPMethodsEnum.NOTIFY)
         {
             _sipLogger.LogEvent($"{sipRequest.Method} received — sending 200 OK");
+            var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
+            _ = _sipTransport!.SendResponseAsync(okResponse);
+
+            // Blind transfer completion: disconnect immediately
+            var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
+            var sipfrag = sipRequest.Body ?? "";
+            if (subscriptionState.Contains("terminated") && sipfrag.Contains("SIP/2.0 200 OK"))
+            {
+                _sipLogger.LogEvent("Transfer complete (NOTIFY terminated + 200 OK) — disconnecting");
+                if (_manualCallInProgress)
+                {
+                    CleanupManualCall();
+                }
+                else if (_userAgent?.IsCallActive == true)
+                {
+                    _userAgent.Hangup();
+                }
+                if (!_callEndedFired)
+                {
+                    _callEndedFired = true;
+                    CallEnded?.Invoke();
+                }
+            }
+        }
+        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
+        {
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
         }
