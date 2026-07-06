@@ -10,6 +10,7 @@ namespace SipClient.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private readonly SipService _sipService;
+    private readonly TransferService _transferService;
     private readonly CallHistoryService _historyService;
     private readonly NotificationService _notificationService;
     private readonly ConfigService _configService;
@@ -111,6 +112,9 @@ public partial class MainViewModel : ObservableObject
         ILogger<SipService> logger = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance.CreateLogger<SipService>();
         _sipService = new SipService(logger);
         _sipService.SetLoggingEnabled(SipLoggingEnabled);
+
+        // Create transfer service (separate module)
+        _transferService = new TransferService(_sipService.GetSipLogger());
 
         _sipService.RegistrationStateChanged += OnRegistrationStateChanged;
         _sipService.IncomingCall += OnIncomingCall;
@@ -320,21 +324,29 @@ public partial class MainViewModel : ObservableObject
     {
         if (string.IsNullOrEmpty(TransferNumber)) return;
 
+        var dialogInfo = _sipService.GetCallDialogInfo();
+        if (dialogInfo == null)
+        {
+            _notificationService.ShowNotification("Ошибка", "Нет активного звонка для трансфера", NotificationType.Error);
+            return;
+        }
+
         ShowTransferDialog = false;
         StatusText = $"Трансфер на {TransferNumber}...";
         StatusBrush = "#FFC107";
 
-        var result = await _sipService.BlindTransferAsync(TransferNumber);
+        var (remoteEP, callId, fromHeader, toHeader, cseq) = dialogInfo.Value;
+        var result = await _transferService.SendReferInDialog(TransferNumber, remoteEP, callId, fromHeader, toHeader, cseq);
 
         if (result)
         {
-            StatusText = "Трансфер выполнен";
+            StatusText = "Трансфер отправлен";
             StatusBrush = "#4CAF50";
-            _notificationService.ShowNotification("Трансфер", $"Вызов переведён на {TransferNumber}", NotificationType.Success);
+            _notificationService.ShowNotification("Трансфер", $"REFER отправлен на {TransferNumber}", NotificationType.Success);
         }
         else
         {
-            StatusText = "Трансфер отклонён";
+            StatusText = "Ошибка трансфера";
             StatusBrush = "#FF5252";
         }
     }

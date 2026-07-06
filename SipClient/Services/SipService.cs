@@ -48,6 +48,32 @@ public class SipService
     public bool IsInCall => _manualCallInProgress || _userAgent?.IsCallActive == true;
     public string? CurrentCallId { get; private set; }
 
+    /// <summary>
+    /// Получить информацию о текущем диалоге для трансфера.
+    /// </summary>
+    public (SIPEndPoint? remoteEndPoint, string? callId, SIPFromHeader? fromHeader, SIPToHeader? toHeader, int cseq)? GetCallDialogInfo()
+    {
+        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
+        {
+            return (_outgoingRemoteEndPoint, _outgoingCallId, _outgoingFromHeader, _outgoingToHeader, _outgoingCSeq);
+        }
+        else if (_userAgent?.IsCallActive == true && _userAgent?.Dialogue != null)
+        {
+            var d = _userAgent!.Dialogue!;
+            return (
+                d.RemoteSIPEndPoint,
+                d.CallId,
+                new SIPFromHeader(
+                    d.LocalUserField?.Name ?? _config.Username,
+                    d.LocalUserField?.URI ?? SIPURI.ParseSIPURIRelaxed($"sip:{_config.Username}@{_config.Server}"),
+                    d.LocalTag),
+                new SIPToHeader(null, d.RemoteTarget, d.RemoteTag),
+                d.CSeq
+            );
+        }
+        return null;
+    }
+
     public event Action<int, string>? RegistrationStateChanged;
     public event Action<string, string>? IncomingCall;
     public event Action<string, int, string>? CallStateChanged;
@@ -480,88 +506,6 @@ public class SipService
         }
     }
 
-    public async Task<bool> BlindTransferAsync(string destination)
-    {
-        if (_sipTransport == null)
-        {
-            ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
-            return false;
-        }
-
-        SIPEndPoint? remoteEP = null;
-        string? callId = null;
-        SIPFromHeader? fromHeader = null;
-        SIPToHeader? toHeader = null;
-
-        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
-        {
-            remoteEP = _outgoingRemoteEndPoint;
-            callId = _outgoingCallId;
-            fromHeader = _outgoingFromHeader;
-            toHeader = _outgoingToHeader;
-        }
-        else if (_userAgent?.IsCallActive == true && _userAgent?.Dialogue != null)
-        {
-            var dialogue = _userAgent!.Dialogue!;
-            remoteEP = dialogue.RemoteSIPEndPoint;
-            callId = dialogue.CallId;
-            fromHeader = new SIPFromHeader(
-                dialogue.LocalUserField?.Name ?? _config.Username,
-                dialogue.LocalUserField?.URI ?? SIPURI.ParseSIPURIRelaxed($"sip:{_config.Username}@{_config.Server}"),
-                dialogue.LocalTag);
-            toHeader = new SIPToHeader(null, dialogue.RemoteTarget, dialogue.RemoteTag);
-        }
-        else
-        {
-            ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
-            return false;
-        }
-
-        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!);
-    }
-
-    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader)
-    {
-        try
-        {
-            var referTarget = $"sip:{destination}@{_config.Server}";
-            var referRequest = SIPRequest.GetRequest(SIPMethodsEnum.REFER, SIPURI.ParseSIPURIRelaxed(referTarget));
-
-            referRequest.Header.CallId = callId;
-            referRequest.Header.From = fromHeader;
-            referRequest.Header.To = toHeader;
-            referRequest.Header.CSeqMethod = SIPMethodsEnum.REFER;
-            _outgoingCSeq += 2;
-            referRequest.Header.CSeq = _outgoingCSeq;
-            referRequest.Header.ReferTo = $"<{referTarget}>";
-
-            var localPort = ((SIPUDPChannel)_sipTransport!.GetSIPChannels().First()).Port;
-            referRequest.Header.ReferredBy = $"<sip:{_config.Username}@{localPort}>";
-
-            var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
-            referRequest.Header.Contact = new List<SIPContactHeader>
-            {
-                new SIPContactHeader(
-                    string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
-                    contactUri)
-            };
-            referRequest.Header.UserAgent = "SipClient/" + SipVersion.String;
-            referRequest.Header.MaxForwards = 70;
-
-            _sipLogger.LogEvent($"Sending REFER to {remoteEP} — Transfer to {destination} (Refer-To: {referTarget})");
-            _ = _sipTransport.SendRequestAsync(remoteEP, referRequest);
-
-            await Task.Delay(1000);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _sipLogger.LogError($"Transfer failed: {ex.Message}");
-            ErrorOccurred?.Invoke($"Ошибка трансфера: {ex.Message}");
-            return false;
-        }
-    }
-
     private void OnCallTrying(ISIPClientUserAgent uac, SIPResponse sipResponse)
     {
         _sipLogger.LogEvent($"Call trying: {sipResponse.StatusCode} {sipResponse.ReasonPhrase}");
@@ -717,25 +661,6 @@ public class SipService
         catch (Exception ex)
         {
             _sipLogger.LogError($"Failed to send BYE: {ex.Message}");
-        }
-    }
-
-    private void DisconnectAfterTransfer()
-    {
-        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
-        {
-            SendByeForManualCall();
-            CleanupManualCall();
-        }
-        else if (_userAgent != null && _userAgent.IsCallActive)
-        {
-            _userAgent.Hangup();
-        }
-
-        if (!_callEndedFired)
-        {
-            _callEndedFired = true;
-            CallEnded?.Invoke();
         }
     }
 
@@ -1083,28 +1008,11 @@ public class SipService
                 CleanupCall();
             }
         }
-        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
+        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER || sipRequest.Method == SIPMethodsEnum.NOTIFY)
         {
+            _sipLogger.LogEvent($"{sipRequest.Method} received — sending 200 OK");
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
-        }
-        else if (sipRequest.Method == SIPMethodsEnum.NOTIFY)
-        {
-            // Always send 200 OK for NOTIFY
-            var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
-            _ = _sipTransport!.SendResponseAsync(okResponse);
-
-            var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
-
-            if (_manualCallInProgress)
-            {
-                _sipLogger.LogEvent("Blind transfer NOTIFY received — disconnecting");
-                DisconnectAfterTransfer();
-            }
-            else
-            {
-                _sipLogger.LogEvent($"NOTIFY received (state: {subscriptionState}) — acknowledged");
-            }
         }
 
         return Task.CompletedTask;
@@ -1126,6 +1034,8 @@ public class SipService
     }
 
     public string GetLogPath() => _sipLogger.GetLogPath();
+
+    public SipLogger GetSipLogger() => _sipLogger;
 }
 
 public class AudioDeviceInfo
