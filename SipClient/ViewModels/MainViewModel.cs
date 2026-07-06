@@ -339,7 +339,8 @@ public partial class MainViewModel : ObservableObject
         var (remoteEP, callId, fromHeader, toHeader, cseq) = dialogInfo.Value;
         var result = await _transferService.SendReferInDialog(TransferNumber, remoteEP, callId, fromHeader, toHeader, cseq);
 
-        if (result)
+        // Don't overwrite status if call already ended (NOTIFY disconnect)
+        if (result && IsInCall)
         {
             StatusText = "Ожидание завершения перевода...";
             StatusBrush = "#FFC107";
