@@ -44,7 +44,7 @@
 | 2 | Исходящий звонок | SipService.MakeCallAsync | ✅ tested, locked |
 | 3 | Входящий звонок | SipService.AnswerCall | ✅ tested, locked |
 | 4 | Завершение | SipService.HangupCall | ✅ tested, locked |
-| 5 | Трансфер | SipService.BlindTransferAsync | ⏭ skipped (not tested yet) |
+| 5 | Трансфер | SipService.BlindTransferAsync | 🔧 implemented, pending test |
 | 6 | Настройки | ConfigService, SettingsWindow | ⏭ skipped |
 | 7 | История | CallHistoryService | ✅ tested, locked |
 | 8 | Аудио | Volume, device selection | ✅ tested, locked |
