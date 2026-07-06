@@ -46,7 +46,7 @@
 | 4 | Завершение | SipService.HangupCall | ✅ tested, locked |
 | 5 | Трансфер | SipService.BlindTransferAsync | ⏭ skipped (not tested yet) |
 | 6 | Настройки | ConfigService, SettingsWindow | ⏭ skipped |
-| 7 | История | CallHistoryService | 🔒 pending |
+| 7 | История | CallHistoryService | ✅ tested, locked |
 | 8 | Аудио | Volume, device selection | 🔒 pending |
 
 ## SIPSorcery API (верифицировано)
