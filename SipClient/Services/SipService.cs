@@ -465,7 +465,48 @@ public class SipService
 
     public async Task<bool> BlindTransferAsync(string destination)
     {
-        if (_userAgent == null || !_userAgent.IsCallActive)
+        // Manual call path (outgoing calls via manual INVITE)
+        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
+        {
+            return await BlindTransferManualAsync(destination);
+        }
+
+        // SIPUserAgent path (incoming calls answered via SIPUserAgent)
+        if (_userAgent != null && _userAgent.IsCallActive)
+        {
+            try
+            {
+                if (!SIPURI.TryParse(destination, out var uri))
+                    uri = SIPURI.ParseSIPURIRelaxed($"{destination}@{_config.Server}");
+
+                _sipLogger.LogEvent($"Blind transfer (agent) to {destination}");
+                var result = await _userAgent.BlindTransfer(uri, TimeSpan.FromSeconds(10), CancellationToken.None);
+
+                if (result)
+                    _sipLogger.LogEvent("Transfer accepted by remote");
+                else
+                {
+                    _sipLogger.LogEvent("Transfer rejected by remote");
+                    ErrorOccurred?.Invoke("Трансфер отклонён");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _sipLogger.LogError($"Transfer failed: {ex.Message}");
+                ErrorOccurred?.Invoke($"Ошибка трансфера: {ex.Message}");
+                return false;
+            }
+        }
+
+        ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
+        return false;
+    }
+
+    private async Task<bool> BlindTransferManualAsync(string destination)
+    {
+        if (_sipTransport == null || _outgoingRemoteEndPoint == null || _outgoingCallId == null)
         {
             ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
             return false;
@@ -473,25 +514,42 @@ public class SipService
 
         try
         {
-            if (!SIPURI.TryParse(destination, out var uri))
-            {
-                uri = SIPURI.ParseSIPURIRelaxed($"{destination}@{_config.Server}");
-            }
+            var referTarget = $"sip:{destination}@{_config.Server}";
 
-            _sipLogger.LogEvent($"Blind transfer to {destination}");
-            var result = await _userAgent.BlindTransfer(uri, TimeSpan.FromSeconds(10), CancellationToken.None);
+            var referRequest = SIPRequest.GetRequest(SIPMethodsEnum.REFER, SIPURI.ParseSIPURIRelaxed(referTarget));
 
-            if (result)
-            {
-                _sipLogger.LogEvent("Transfer accepted by remote");
-            }
-            else
-            {
-                _sipLogger.LogEvent("Transfer rejected by remote");
-                ErrorOccurred?.Invoke("Трансфер отклонён");
-            }
+            // In-dialog headers
+            referRequest.Header.CallId = _outgoingCallId;
+            referRequest.Header.From = _outgoingFromHeader;
+            referRequest.Header.To = _outgoingToHeader;
+            referRequest.Header.CSeqMethod = SIPMethodsEnum.REFER;
+            _outgoingCSeq += 2;
+            referRequest.Header.CSeq = _outgoingCSeq;
 
-            return result;
+            // Refer-To header
+            referRequest.Header.ReferTo = $"<{referTarget}>";
+
+            // Referred-By
+            var localPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            referRequest.Header.ReferredBy = $"<sip:{_config.Username}@{localPort}>";
+
+            var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
+            referRequest.Header.Contact = new List<SIPContactHeader>
+            {
+                new SIPContactHeader(
+                    string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
+                    contactUri)
+            };
+            referRequest.Header.UserAgent = "SipClient/" + SipVersion.String;
+            referRequest.Header.MaxForwards = 70;
+
+            _sipLogger.LogEvent($"Sending REFER to {_outgoingRemoteEndPoint} — Transfer to {destination}");
+            _ = _sipTransport.SendRequestAsync(_outgoingRemoteEndPoint, referRequest);
+
+            // Wait for 202 Accepted
+            await Task.Delay(2000);
+            _sipLogger.LogEvent("Transfer REFER sent");
+            return true;
         }
         catch (Exception ex)
         {
@@ -1003,8 +1061,9 @@ public class SipService
                 CleanupCall();
             }
         }
-        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
+        else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER || sipRequest.Method == SIPMethodsEnum.NOTIFY)
         {
+            _sipLogger.LogEvent($"{sipRequest.Method} received — sending 200 OK");
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
         }
