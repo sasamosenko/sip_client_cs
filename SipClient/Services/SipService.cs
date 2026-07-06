@@ -42,6 +42,7 @@ public class SipService
     private SIPEndPoint? _outgoingRemoteEndPoint;
     private string? _remoteContactUri;
     private bool _outgoingCallAnswered;
+    private SIPRequest? _outgoingInviteRequest;
 
     public bool IsRegistered => _registrar != null;
     public bool IsInCall => _manualCallInProgress || _userAgent?.IsCallActive == true;
@@ -435,6 +436,7 @@ public class SipService
             _outgoingFromHeader = invite.Header.From;
             _outgoingToHeader = invite.Header.To;
             _outgoingCSeq = 1;
+            _outgoingInviteRequest = invite;
 
             // Resolve server endpoint
             var addresses = await Dns.GetHostEntryAsync(_config.Server);
@@ -712,6 +714,12 @@ public class SipService
                 CallStateChanged?.Invoke(CurrentCallId!, 3, "Ringing");
                 break;
 
+            case 401: // Unauthorized — retry with digest auth
+                _sipLogger.LogEvent("Call unauthorized (401) — retrying with digest auth");
+                SendAckForResponse(sipResponse, remoteEndPoint);
+                ResendInviteWithAuth(sipResponse, remoteEndPoint);
+                break;
+
             case >= 200 and < 300: // 200 OK — call answered
                 _sipLogger.LogEvent($"Call answered ({statusCode})");
                 HandleManualCallAnswered(sipResponse, remoteEndPoint);
@@ -793,6 +801,78 @@ public class SipService
         catch (Exception ex)
         {
             _sipLogger.LogError($"Failed to send ACK: {ex.Message}");
+        }
+    }
+
+    private void ResendInviteWithAuth(SIPResponse sipResponse, SIPEndPoint remoteEndPoint)
+    {
+        if (_sipTransport == null || _outgoingInviteRequest == null || remoteEndPoint == null) return;
+
+        try
+        {
+            // Parse WWW-Authenticate header
+            var wwwAuth = sipResponse.Header.AuthenticationHeaders?.FirstOrDefault();
+            if (wwwAuth == null)
+            {
+                _sipLogger.LogError("No WWW-Authenticate header in 401 response");
+                CallFailedWithReason?.Invoke(CurrentCallId ?? "", "No authentication challenge");
+                CleanupManualCall();
+                return;
+            }
+
+            // Copy original INVITE
+            var authInvite = _outgoingInviteRequest.Copy();
+            _outgoingCSeq++;
+            authInvite.Header.CSeq = _outgoingCSeq;
+
+            // Compute digest auth
+            var authHeader = ComputeDigestAuth(authInvite, wwwAuth);
+            if (authHeader != null)
+            {
+                authInvite.Header.AuthenticationHeaders ??= new List<SIPAuthenticationHeader>();
+                authInvite.Header.AuthenticationHeaders.Add(authHeader);
+            }
+
+            _sipLogger.LogEvent($"Resending INVITE with Authorization to {remoteEndPoint}");
+            _ = _sipTransport.SendRequestAsync(remoteEndPoint, authInvite);
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Failed to resend INVITE with auth: {ex.Message}");
+            CallFailedWithReason?.Invoke(CurrentCallId ?? "", ex.Message);
+            CleanupManualCall();
+        }
+    }
+
+    private SIPAuthenticationHeader? ComputeDigestAuth(SIPRequest request, SIPAuthenticationHeader challenge)
+    {
+        try
+        {
+            var username = _config.AuthUsername ?? _config.Username;
+            var uri = request.URI.ToString();
+            var method = request.Method.ToString();
+            var realm = challenge.SIPDigest.Realm;
+            var nonce = challenge.SIPDigest.Nonce;
+
+            // Create digest with all params — SIPAuthorisationDigest computes MD5 internally
+            var digest = new SIPAuthorisationDigest(
+                SIPAuthorisationHeadersEnum.Authorize,
+                realm,
+                username,
+                _config.Password,
+                uri,
+                nonce,
+                method,
+                DigestAlgorithmsEnum.MD5);
+
+            var authHeader = new SIPAuthenticationHeader(digest);
+            _sipLogger.LogEvent($"Computed digest auth: username={username}, realm={realm}");
+            return authHeader;
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Failed to compute digest auth: {ex.Message}");
+            return null;
         }
     }
 

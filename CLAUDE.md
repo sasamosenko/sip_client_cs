@@ -40,7 +40,7 @@
 
 | # | Модуль | Файлы | Статус |
 |---|--------|-------|--------|
-| 1 | Регистрация | SipService.RegisterAsync | 🔒 pending |
+| 1 | Регистрация | SipService.RegisterAsync | ✅ tested, locked |
 | 2 | Исходящий звонок | SipService.MakeCallAsync | 🔒 pending |
 | 3 | Входящий звонок | SipService.AnswerCall | 🔒 pending |
 | 4 | Завершение | SipService.HangupCall | 🔒 pending |
