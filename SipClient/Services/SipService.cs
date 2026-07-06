@@ -826,12 +826,9 @@ public class SipService
             authInvite.Header.CSeq = _outgoingCSeq;
 
             // Compute digest auth
-            var authHeader = ComputeDigestAuth(authInvite, wwwAuth);
-            if (authHeader != null)
-            {
-                authInvite.Header.AuthenticationHeaders ??= new List<SIPAuthenticationHeader>();
-                authInvite.Header.AuthenticationHeaders.Add(authHeader);
-            }
+            var authHeaderStr = ComputeDigestAuth(authInvite, wwwAuth);
+            authInvite.Header.UnknownHeaders ??= new List<string>();
+            authInvite.Header.UnknownHeaders.Add($"Authorization: {authHeaderStr}");
 
             _sipLogger.LogEvent($"Resending INVITE with Authorization to {remoteEndPoint}");
             _ = _sipTransport.SendRequestAsync(remoteEndPoint, authInvite);
@@ -844,36 +841,34 @@ public class SipService
         }
     }
 
-    private SIPAuthenticationHeader? ComputeDigestAuth(SIPRequest request, SIPAuthenticationHeader challenge)
+    private string ComputeDigestAuth(SIPRequest request, SIPAuthenticationHeader challenge)
     {
-        try
-        {
-            var username = _config.AuthUsername ?? _config.Username;
-            var uri = request.URI.ToString();
-            var method = request.Method.ToString();
-            var realm = challenge.SIPDigest.Realm;
-            var nonce = challenge.SIPDigest.Nonce;
+        var username = string.IsNullOrEmpty(_config.AuthUsername) ? _config.Username : _config.AuthUsername;
+        var uri = request.URI.ToString();
+        var method = request.Method.ToString();
+        var realm = challenge.SIPDigest.Realm;
+        var nonce = challenge.SIPDigest.Nonce;
+        var qop = "auth";
 
-            // Create digest with all params — SIPAuthorisationDigest computes MD5 internally
-            var digest = new SIPAuthorisationDigest(
-                SIPAuthorisationHeadersEnum.Authorize,
-                realm,
-                username,
-                _config.Password,
-                uri,
-                nonce,
-                method,
-                DigestAlgorithmsEnum.MD5);
+        // HA1 = MD5(username:realm:password)
+        var ha1 = Md5Hex($"{username}:{realm}:{_config.Password}");
+        // HA2 = MD5(method:uri)
+        var ha2 = Md5Hex($"{method}:{uri}");
+        var nc = "00000001";
+        var cnonce = Guid.NewGuid().ToString("N").Substring(0, 8);
+        // response = MD5(HA1:nonce:nc:cnonce:qop:HA2)
+        var response = Md5Hex($"{ha1}:{nonce}:{nc}:{cnonce}:{qop}:{ha2}");
 
-            var authHeader = new SIPAuthenticationHeader(digest);
-            _sipLogger.LogEvent($"Computed digest auth: username={username}, realm={realm}");
-            return authHeader;
-        }
-        catch (Exception ex)
-        {
-            _sipLogger.LogError($"Failed to compute digest auth: {ex.Message}");
-            return null;
-        }
+        var header = $"Digest username=\"{username}\",realm=\"{realm}\",nonce=\"{nonce}\",uri=\"{uri}\",response=\"{response}\",algorithm=MD5,cnonce=\"{cnonce}\",nc={nc},qop={qop}";
+        _sipLogger.LogEvent($"Computed digest: user={username}, realm={realm}, response={response.Substring(0, 8)}...");
+        return header;
+    }
+
+    private static string Md5Hex(string input)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(input);
+        var hash = System.Security.Cryptography.MD5.HashData(bytes);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private Task OnSipRequestReceived(SIPEndPoint localSIPEndPoint, SIPEndPoint remoteEndPoint, SIPRequest sipRequest)
