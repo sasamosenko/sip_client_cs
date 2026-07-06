@@ -43,6 +43,11 @@ public class CallHistoryService
         records.Insert(0, record);
         Save(records);
     }
+
+    public void Clear()
+    {
+        Save(new List<CallRecord>());
+    }
     
     public void Save(List<CallRecord> records)
     {

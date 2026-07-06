@@ -29,6 +29,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private bool _showTransferDialog;
 
     [ObservableProperty] private string _server = "";
+    [ObservableProperty] private string _proxy = "";
     [ObservableProperty] private int _port = 5060;
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
@@ -66,6 +67,7 @@ public partial class MainViewModel : ObservableObject
 
         // Load settings
         Server = _config.Server;
+        Proxy = _config.Proxy;
         Port = _config.Port;
         Username = _config.Username;
         Password = _config.Password;
@@ -118,6 +120,12 @@ public partial class MainViewModel : ObservableObject
         _sipService.ErrorOccurred += OnErrorOccurred;
 
         // Auto-connect on startup if credentials are configured
+        // Also support --call, --server, --username, --password command-line args for testing
+        var autoCall = App.AutoCallNumber;
+        if (!string.IsNullOrEmpty(App.TestServer)) Server = App.TestServer;
+        if (!string.IsNullOrEmpty(App.TestUsername)) Username = App.TestUsername;
+        if (!string.IsNullOrEmpty(App.TestPassword)) Password = App.TestPassword;
+
         if (!string.IsNullOrEmpty(Server) && !string.IsNullOrEmpty(Username))
         {
             _ = Task.Run(async () =>
@@ -126,6 +134,20 @@ public partial class MainViewModel : ObservableObject
                 await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
                 {
                     await ConnectAsync();
+
+                    // Auto-call after successful registration
+                    if (!string.IsNullOrEmpty(autoCall))
+                    {
+                        // Wait for registration
+                        for (int i = 0; i < 30 && !IsRegistered; i++)
+                            await Task.Delay(1000);
+
+                        if (IsRegistered)
+                        {
+                            PhoneNumber = autoCall;
+                            await CallAsync();
+                        }
+                    }
                 });
             });
         }
@@ -185,6 +207,7 @@ public partial class MainViewModel : ObservableObject
     private void SaveConfigToService()
     {
         _config.Server = Server;
+        _config.Proxy = Proxy;
         _config.Port = Port;
         _config.Username = Username;
         _config.Password = Password;
@@ -319,6 +342,22 @@ public partial class MainViewModel : ObservableObject
     private void CancelTransfer()
     {
         ShowTransferDialog = false;
+    }
+
+    [RelayCommand]
+    private void Redial(string? number)
+    {
+        if (string.IsNullOrEmpty(number) || IsInCall) return;
+        PhoneNumber = number;
+        _ = CallAsync();
+    }
+
+    [RelayCommand]
+    private void ClearCallHistory()
+    {
+        CallHistory.Clear();
+        IsHistoryEmpty = true;
+        _historyService.Clear();
     }
 
     private void OnRegistrationStateChanged(int code, string reason)

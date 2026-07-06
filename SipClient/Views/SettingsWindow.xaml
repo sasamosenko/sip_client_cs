@@ -29,26 +29,36 @@
                         <ColumnDefinition Width="100"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="Сервер" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock Text="SIP Server" Style="{StaticResource FieldLabel}"
+                                   ToolTip="Адрес SIP-сервера для регистрации (напр. sip.provider.com)"/>
                         <TextBox Text="{Binding Server, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ModernTextBox}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="Порт" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock Text="Порт" Style="{StaticResource FieldLabel}"
+                                   ToolTip="Порт SIP-сервера (по умолчанию 5060)"/>
                         <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ModernTextBox}"/>
                     </StackPanel>
                 </Grid>
 
-                <TextBlock Text="Локальный порт" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="SIP Proxy" Style="{StaticResource FieldLabel}"
+                           ToolTip="SIP-прокси для маршрутизации вызовов. Если пусто — используется SIP Server"/>
+                <TextBox Text="{Binding Proxy, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
+
+                <TextBlock Text="Local Port" Style="{StaticResource FieldLabel}"
+                           ToolTip="Локальный порт для прослушивания SIP-трафика (по умолчанию 5060)"/>
                 <TextBox Text="{Binding LocalPort, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
 
-                <TextBlock Text="Логин" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="Username" Style="{StaticResource FieldLabel}"
+                           ToolTip="Имя пользователя SIP-аккаунта (напр. extension или логин)"/>
                 <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}" Margin="0,0,0,12"/>
 
-                <TextBlock Text="Пароль" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="Password" Style="{StaticResource FieldLabel}"
+                           ToolTip="Пароль SIP-аккаунта для авторизации"/>
                 <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -89,19 +99,23 @@
                     </ToggleButton>
                 </Grid>
 
-                <TextBlock Text="Домен (SIP realm)" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
+                <TextBlock Text="Domain" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"
+                           ToolTip="SIP-домен (realm) для идентификации — используется в SIP URI From/To"/>
                 <TextBox Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}"/>
 
-                <TextBlock Text="Auth логин" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
+                <TextBlock Text="Login" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"
+                           ToolTip="Логин для SIP-авторизации (если пусто — используется Username)"/>
                 <TextBox Text="{Binding AuthUsername, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}"/>
 
-                <TextBlock Text="Отображаемое имя" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
+                <TextBlock Text="Display Name" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"
+                           ToolTip="Отображаемое имя — видно абоненту при входящем вызове"/>
                 <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}"/>
 
-                <TextBlock Text="User-Agent" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"/>
+                <TextBlock Text="User-Agent" Style="{StaticResource FieldLabel}" Margin="0,12,0,6"
+                           ToolTip="Заголовок User-Agent в SIP-запросах (по умолчанию SipClient/1.0)"/>
                 <TextBox Text="{Binding UserAgent, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}"/>
 
@@ -181,12 +195,14 @@
                           IsChecked="{Binding AutoAnswerEnabled}"
                           Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
 
-                <TextBlock Text="Задержка (сек)" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="Задержка (сек)" Style="{StaticResource FieldLabel}"
+                           ToolTip="Задержка в секундах перед автоматическим принятием звонка"/>
                 <TextBox Text="{Binding AutoAnswerDelay}"
                          Style="{StaticResource ModernTextBox}"/>
 
                 <TextBlock Text="Регистрация" Style="{StaticResource SectionHeader}"/>
-                <TextBlock Text="Период перерегистрации (сек)" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="Период перерегистрации (сек)" Style="{StaticResource FieldLabel}"
+                           ToolTip="Как часто обновлять регистрацию на сервере (по умолчанию 300 сек)"/>
                 <TextBox Text="{Binding RegistrationExpiry}"
                          Style="{StaticResource ModernTextBox}"/>
 
@@ -198,12 +214,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="От" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock Text="От" Style="{StaticResource FieldLabel}"
+                                   ToolTip="Минимальный порт для RTP-медиа (аудио)"/>
                         <TextBox Text="{Binding RtpPortMin}"
                                  Style="{StaticResource ModernTextBox}"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2">
-                        <TextBlock Text="До" Style="{StaticResource FieldLabel}"/>
+                        <TextBlock Text="До" Style="{StaticResource FieldLabel}"
+                                   ToolTip="Максимальный порт для RTP-медиа (аудио)"/>
                         <TextBox Text="{Binding RtpPortMax}"
                                  Style="{StaticResource ModernTextBox}"/>
                     </StackPanel>

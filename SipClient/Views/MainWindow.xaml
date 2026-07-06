@@ -211,14 +211,28 @@
             <!-- === CALL HISTORY (always visible) === -->
             <Border Margin="16,12" Style="{StaticResource CardBorder}"
                     Visibility="{Binding IsInCall, Converter={StaticResource InvertedBoolToVis}}">
-                <Grid>
+                    <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Row="0" Text="История звонков" FontSize="18" FontWeight="SemiBold"
-                               Foreground="White" Margin="0,0,0,12"/>
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="История звонков" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="White" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Command="{Binding ClearCallHistoryCommand}"
+                                Style="{StaticResource IconButton}" Padding="8,4"
+                                ToolTip="Очистить историю" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="M6,19c0,1.1.9,2,2,2h8c1.1,0,2-.9,2-2V7H6v12zM19,4h-3.5l-1-1h-5l-1,1H5v2h14V4z"
+                                      Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
 
                     <ListBox Grid.Row="1" ItemsSource="{Binding CallHistory}"
                              Style="{StaticResource ModernListBox}"
@@ -230,6 +244,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="44"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
@@ -267,6 +282,14 @@
                                     </StackPanel>
 
                                     <Button Grid.Column="3" Grid.RowSpan="2"
+                                            Tag="{Binding Number}" Click="Redial_Click"
+                                            Style="{StaticResource IconButton}" Padding="6"
+                                            VerticalAlignment="Center" ToolTip="Позвонить">
+                                        <Path Data="M6.62,10.79C8.06,13.62 10.38,15.93 13.21,17.38L15.41,15.18C15.69,14.9 16.08,14.82 16.43,14.93C17.55,15.3 18.75,15.5 20,15.5C20.55,15.5 21,15.95 21,16.5V20C21,20.55 20.55,21 20,21C10.61,21 3,13.39 3,4C3,3.45 3.45,3 4,3H7.5C8.05,3 8.5,3.45 8.5,4C8.5,5.25 8.7,6.45 9.07,7.57C9.18,7.92 9.1,8.31 8.82,8.59L6.62,10.79Z"
+                                              Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource PrimaryBrush}" VerticalAlignment="Center"/>
+                                    </Button>
+
+                                    <Button Grid.Column="4" Grid.RowSpan="2"
                                             Tag="{Binding}" Click="CopyCallRecord_Click"
                                             Style="{StaticResource IconButton}" Padding="6"
                                             VerticalAlignment="Center" ToolTip="Копировать (CSV)">

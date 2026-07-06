@@ -3,6 +3,7 @@ namespace SipClient.Models;
 public class SipConfig
 {
     public string Server { get; set; } = "";
+    public string Proxy { get; set; } = "";
     public int Port { get; set; } = 5060;
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";

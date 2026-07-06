@@ -47,6 +47,15 @@ public partial class MainWindow : Window
             record.CopyToClipboard();
     }
 
+    private void Redial_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.Tag is string number
+            && DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.RedialCommand.Execute(number);
+        }
+    }
+
     private void CallHistory_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control

@@ -29,12 +29,22 @@ public class SipService
     private int _lastLoggedSpeaker = -1;
     private bool _hangupInProgress;
     private bool _callEndedFired;
+    private bool _manualCallInProgress;
 
     // Stored dialogue info for sending BYE even after agent cleanup
     private SIPDialogue? _activeDialogue;
 
+    // Manual INVITE tracking
+    private string? _outgoingCallId;
+    private SIPFromHeader? _outgoingFromHeader;
+    private SIPToHeader? _outgoingToHeader;
+    private int _outgoingCSeq = 1;
+    private SIPEndPoint? _outgoingRemoteEndPoint;
+    private string? _remoteContactUri;
+    private bool _outgoingCallAnswered;
+
     public bool IsRegistered => _registrar != null;
-    public bool IsInCall => _userAgent?.IsCallActive == true;
+    public bool IsInCall => _manualCallInProgress || _userAgent?.IsCallActive == true;
     public string? CurrentCallId { get; private set; }
 
     public event Action<int, string>? RegistrationStateChanged;
@@ -369,36 +379,79 @@ public class SipService
             CurrentCallId = Guid.NewGuid().ToString("N");
             _hangupInProgress = false;
             _callEndedFired = false;
+            _outgoingCallAnswered = false;
+            _remoteContactUri = null;
 
             _rtpSession = CreateMediaSession();
 
-            _userAgent = new SIPUserAgent(_sipTransport, null);
-            _userAgent.ClientCallTrying += OnCallTrying;
-            _userAgent.ClientCallRinging += OnCallRinging;
-            _userAgent.ClientCallAnswered += OnCallAnswered;
-            _userAgent.ClientCallFailed += OnCallFailed;
-            _userAgent.OnCallHungup += OnCallHungup;
+            // Generate SDP offer
+            var sdpOffer = _rtpSession.CreateOffer(null);
+            if (sdpOffer == null)
+            {
+                _sipLogger.LogError("Failed to create SDP offer");
+                ErrorOccurred?.Invoke("Не удалось создать SDP offer");
+                CleanupCall();
+                return;
+            }
+            var sdpBody = sdpOffer.ToString();
+            _sipLogger.LogEvent($"SDP offer:\n{sdpBody}");
 
-            var callUri = $"sip:{number}@{_config.Server}";
-            var fromUri = $"sip:{_config.Username}@{_config.Server}";
-            var callDescriptor = new SIPCallDescriptor(
-                _config.Username,
-                _config.Password,
-                callUri,
+            var domain = string.IsNullOrEmpty(_config.Domain) ? _config.Server : _config.Domain;
+            var callUri = SIPURI.ParseSIPURI($"sip:{number}@{domain}");
+            var fromUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{domain}");
+
+            // Build INVITE request manually
+            var invite = SIPRequest.GetRequest(SIPMethodsEnum.INVITE, callUri);
+
+            // Set From with display name and tag
+            invite.Header.From = new SIPFromHeader(
+                string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
                 fromUri,
-                null,               // to
-                null,               // routeSet
-                null,               // customHeaders
-                _config.Username,   // authUsername
-                SIPCallDirection.Out,
-                "application/sdp",
-                null,               // content
-                null                // mangleIPAddress
-            );
-            callDescriptor.FromDisplayName = _config.DisplayName;
+                CallProperties.CreateNewCallId());
+            invite.Header.CSeqMethod = SIPMethodsEnum.INVITE;
+            invite.Header.CSeq = 1;
 
-            _sipLogger.LogEvent($"Calling {number}");
-            await _userAgent.InitiateCallAsync(callDescriptor, _rtpSession, 120);
+            // Set To
+            invite.Header.To = new SIPToHeader(null, callUri, null);
+
+            // Set Contact header
+            var localPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
+            invite.Header.Contact = new List<SIPContactHeader>
+            {
+                new SIPContactHeader(
+                    string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
+                    contactUri)
+            };
+
+            // Set User-Agent
+            invite.Header.UserAgent = "SipClient/" + SipVersion.String;
+            invite.Header.ContentType = SDP.SDP_MIME_CONTENTTYPE;
+            invite.Header.ContentLength = sdpBody.Length;
+            invite.Body = sdpBody;
+
+            // Store state for response handling
+            _outgoingCallId = invite.Header.CallId;
+            _outgoingFromHeader = invite.Header.From;
+            _outgoingToHeader = invite.Header.To;
+            _outgoingCSeq = 1;
+
+            // Resolve server endpoint
+            var addresses = await Dns.GetHostEntryAsync(_config.Server);
+            if (addresses.AddressList.Length == 0)
+            {
+                _sipLogger.LogError($"DNS resolution failed for {_config.Server}");
+                ErrorOccurred?.Invoke($"Не удалось разрешить {_config.Server}");
+                CleanupCall();
+                return;
+            }
+            _outgoingRemoteEndPoint = new SIPEndPoint(new IPEndPoint(addresses.AddressList[0], _config.Port));
+
+            _manualCallInProgress = true;
+            _sipLogger.LogEvent($"Sending INVITE to {number} via {_outgoingRemoteEndPoint}");
+            CallStateChanged?.Invoke(CurrentCallId!, 2, "Trying");
+
+            await _sipTransport.SendRequestAsync(_outgoingRemoteEndPoint, invite);
         }
         catch (Exception ex)
         {
@@ -511,6 +564,18 @@ public class SipService
 
         _sipLogger.LogEvent("Hangup");
 
+        if (_manualCallInProgress)
+        {
+            SendByeForManualCall();
+            CleanupManualCall();
+            if (!_callEndedFired)
+            {
+                _callEndedFired = true;
+                CallEnded?.Invoke();
+            }
+            return;
+        }
+
         if (_userAgent != null)
         {
             if (_userAgent.IsCallActive)
@@ -541,10 +606,194 @@ public class SipService
         }
     }
 
+    private void SendByeForManualCall()
+    {
+        if (_sipTransport == null || _outgoingRemoteEndPoint == null || _outgoingCallId == null) return;
+
+        try
+        {
+            // Determine remote endpoint for BYE
+            var byeRemoteEndPoint = _outgoingRemoteEndPoint;
+            SIPURI? byeRequestUri = null;
+
+            if (!string.IsNullOrEmpty(_remoteContactUri))
+                byeRequestUri = SIPURI.ParseSIPURIRelaxed(_remoteContactUri);
+
+            // Build BYE request
+            SIPRequest byeRequest;
+            if (byeRequestUri != null)
+            {
+                byeRequest = SIPRequest.GetRequest(SIPMethodsEnum.BYE, byeRequestUri);
+            }
+            else
+            {
+                byeRequest = SIPRequest.GetRequest(SIPMethodsEnum.BYE, SIPURI.ParseSIPURIRelaxed($"sip:{_config.Server}:{_config.Port}"));
+            }
+
+            // Copy dialog headers (swap From/To for BYE — it's from our side)
+            byeRequest.Header.CallId = _outgoingCallId;
+            byeRequest.Header.From = _outgoingFromHeader;
+            byeRequest.Header.To = _outgoingToHeader;
+            byeRequest.Header.CSeqMethod = SIPMethodsEnum.BYE;
+            byeRequest.Header.CSeq = _outgoingCSeq + 2; // increment past INVITE and ACK
+
+            var localPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
+            byeRequest.Header.Contact = new List<SIPContactHeader>
+            {
+                new SIPContactHeader(
+                    string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
+                    contactUri)
+            };
+            byeRequest.Header.UserAgent = "SipClient/" + SipVersion.String;
+            byeRequest.Header.MaxForwards = 70;
+
+            _sipLogger.LogEvent($"Sending BYE to {byeRemoteEndPoint}");
+            _ = _sipTransport.SendRequestAsync(byeRemoteEndPoint, byeRequest);
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Failed to send BYE: {ex.Message}");
+        }
+    }
+
+    private void CleanupManualCall()
+    {
+        _manualCallInProgress = false;
+        _outgoingCallId = null;
+        _outgoingFromHeader = null;
+        _outgoingToHeader = null;
+        _outgoingRemoteEndPoint = null;
+        _remoteContactUri = null;
+        _outgoingCallAnswered = false;
+
+        try
+        {
+            _rtpSession?.Close("manual call cleanup");
+        }
+        catch { }
+        _rtpSession = null;
+        CurrentCallId = null;
+        _hangupInProgress = false;
+    }
+
     private Task OnSipResponseReceived(SIPEndPoint localSIPEndPoint, SIPEndPoint remoteEndPoint, SIPResponse sipResponse)
     {
         _sipLogger.LogEvent($"Response from {remoteEndPoint}: {sipResponse.StatusCode} {sipResponse.ReasonPhrase}");
+
+        // Handle responses to our manual outgoing INVITE
+        if (_manualCallInProgress && !string.IsNullOrEmpty(_outgoingCallId)
+            && sipResponse.Header.CallId == _outgoingCallId)
+        {
+            HandleManualCallResponse(sipResponse, remoteEndPoint);
+        }
+
         return Task.CompletedTask;
+    }
+
+    private void HandleManualCallResponse(SIPResponse sipResponse, SIPEndPoint remoteEndPoint)
+    {
+        var statusCode = sipResponse.StatusCode;
+
+        switch (statusCode)
+        {
+            case 100: // Trying
+                _sipLogger.LogEvent("Call trying (100)");
+                CallStateChanged?.Invoke(CurrentCallId!, 1, "Trying");
+                break;
+
+            case 180: // Ringing
+                _sipLogger.LogEvent("Call ringing (180)");
+                CallStateChanged?.Invoke(CurrentCallId!, 3, "Ringing");
+                break;
+
+            case 183: // Session Progress with early media — handle as ringing, NOT cancel
+                _sipLogger.LogEvent("Session progress (183) — treating as ringing");
+                CallStateChanged?.Invoke(CurrentCallId!, 3, "Ringing");
+                break;
+
+            case >= 200 and < 300: // 200 OK — call answered
+                _sipLogger.LogEvent($"Call answered ({statusCode})");
+                HandleManualCallAnswered(sipResponse, remoteEndPoint);
+                break;
+
+            case >= 300: // Error/failure
+                _sipLogger.LogEvent($"Call failed ({statusCode} {sipResponse.ReasonPhrase})");
+                SendAckForResponse(sipResponse, remoteEndPoint);
+                CallFailedWithReason?.Invoke(CurrentCallId ?? "", sipResponse.ReasonPhrase ?? $"Error {statusCode}");
+                CleanupManualCall();
+                break;
+        }
+    }
+
+    private void HandleManualCallAnswered(SIPResponse sipResponse, SIPEndPoint remoteEndPoint)
+    {
+        if (_outgoingCallAnswered) return; // prevent double-ACK
+        _outgoingCallAnswered = true;
+
+        try
+        {
+            // Store remote Contact for BYE
+            if (sipResponse.Header.Contact?.Count > 0)
+                _remoteContactUri = sipResponse.Header.Contact[0].ContactURI.ToString();
+
+            // Send ACK for 200 OK (separate transaction per RFC 3261)
+            SendAckForResponse(sipResponse, remoteEndPoint);
+
+            // Parse and apply remote SDP answer
+            if (!string.IsNullOrEmpty(sipResponse.Body) && _rtpSession != null)
+            {
+                var remoteSdp = SDP.ParseSDPDescription(sipResponse.Body);
+                _ = _rtpSession.SetRemoteDescription(SdpType.answer, remoteSdp);
+                _ = _rtpSession.Start();
+                _sipLogger.LogEvent("Media session started");
+            }
+
+            CallStateChanged?.Invoke(CurrentCallId!, 5, "OK");
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Error handling 200 OK: {ex.Message}");
+            CallFailedWithReason?.Invoke(CurrentCallId ?? "", ex.Message);
+            CleanupManualCall();
+        }
+    }
+
+    private void SendAckForResponse(SIPResponse sipResponse, SIPEndPoint remoteEndPoint)
+    {
+        if (_sipTransport == null || remoteEndPoint == null) return;
+
+        try
+        {
+            // Build ACK for 2xx response (new transaction per RFC 3261 §13.2.2.4)
+            var requestUri = sipResponse.Header.To?.ToURI;
+            if (requestUri == null) return;
+
+            var ack = SIPRequest.GetRequest(SIPMethodsEnum.ACK, requestUri);
+            ack.Header.CallId = sipResponse.Header.CallId;
+            ack.Header.From = _outgoingFromHeader;
+            ack.Header.To = sipResponse.Header.To;
+            ack.Header.CSeqMethod = SIPMethodsEnum.ACK;
+            ack.Header.CSeq = _outgoingCSeq + 1; // ACK CSeq is separate from INVITE
+
+            var localPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
+            ack.Header.Contact = new List<SIPContactHeader>
+            {
+                new SIPContactHeader(
+                    string.IsNullOrEmpty(_config.DisplayName) ? _config.Username : _config.DisplayName,
+                    contactUri)
+            };
+            ack.Header.UserAgent = "SipClient/" + SipVersion.String;
+            ack.Header.MaxForwards = 70;
+
+            _sipLogger.LogEvent($"Sending ACK to {remoteEndPoint}");
+            _ = _sipTransport.SendRequestAsync(remoteEndPoint, ack);
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Failed to send ACK: {ex.Message}");
+        }
     }
 
     private Task OnSipRequestReceived(SIPEndPoint localSIPEndPoint, SIPEndPoint remoteEndPoint, SIPRequest sipRequest)
@@ -603,6 +852,22 @@ public class SipService
         else if (sipRequest.Method == SIPMethodsEnum.BYE)
         {
             _sipLogger.LogEvent("BYE received from remote");
+
+            if (_manualCallInProgress)
+            {
+                // Manual call — BYE from remote, send 200 OK then clean up
+                _sipLogger.LogEvent("Remote BYE for manual call — sending 200 OK");
+                var byeOkResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
+                _ = _sipTransport!.SendResponseAsync(byeOkResponse);
+
+                if (!_callEndedFired)
+                {
+                    _callEndedFired = true;
+                    CleanupManualCall();
+                    CallEnded?.Invoke();
+                }
+                return Task.CompletedTask;
+            }
 
             // SIPUserAgent handles BYE internally (sends 200 OK) but OnCallHungup
             // doesn't always fire for outgoing calls. Poll IsCallActive to clean up UI.
