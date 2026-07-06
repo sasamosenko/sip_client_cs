@@ -43,6 +43,7 @@ public class SipService
     private string? _remoteContactUri;
     private bool _outgoingCallAnswered;
     private SIPRequest? _outgoingInviteRequest;
+    private bool _blindTransferPending;
 
     public bool IsRegistered => _registrar != null;
     public bool IsInCall => _manualCallInProgress || _userAgent?.IsCallActive == true;
@@ -480,7 +481,7 @@ public class SipService
         }
     }
 
-    public async Task<bool> BlindTransferAsync(string destination)
+    public async Task<bool> BlindTransferAsync(string destination, bool blind = true)
     {
         if (_sipTransport == null)
         {
@@ -517,13 +518,14 @@ public class SipService
             return false;
         }
 
-        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!);
+        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!, blind);
     }
 
-    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader)
+    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader, bool blind)
     {
         try
         {
+            _blindTransferPending = blind;
             var referTarget = $"sip:{destination}@{_config.Server}";
             var referRequest = SIPRequest.GetRequest(SIPMethodsEnum.REFER, SIPURI.ParseSIPURIRelaxed(referTarget));
 
@@ -717,6 +719,27 @@ public class SipService
         catch (Exception ex)
         {
             _sipLogger.LogError($"Failed to send BYE: {ex.Message}");
+        }
+    }
+
+    private void DisconnectAfterTransfer()
+    {
+        _blindTransferPending = false;
+
+        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
+        {
+            SendByeForManualCall();
+            CleanupManualCall();
+        }
+        else if (_userAgent != null && _userAgent.IsCallActive)
+        {
+            _userAgent.Hangup();
+        }
+
+        if (!_callEndedFired)
+        {
+            _callEndedFired = true;
+            CallEnded?.Invoke();
         }
     }
 
@@ -1075,27 +1098,19 @@ public class SipService
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
 
-            // Check if this is a transfer completion notification
             var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
-            if (subscriptionState.Contains("terminated"))
-            {
-                _sipLogger.LogEvent("Transfer completed (NOTIFY terminated) — hanging up");
-                // Send BYE to disconnect after successful transfer
-                if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
-                {
-                    SendByeForManualCall();
-                    CleanupManualCall();
-                }
-                else if (_userAgent != null && _userAgent.IsCallActive)
-                {
-                    _userAgent.Hangup();
-                }
 
-                if (!_callEndedFired)
-                {
-                    _callEndedFired = true;
-                    CallEnded?.Invoke();
-                }
+            if (_blindTransferPending)
+            {
+                // Blind transfer: disconnect immediately on first NOTIFY after REFER
+                _sipLogger.LogEvent("Blind transfer NOTIFY received — disconnecting");
+                DisconnectAfterTransfer();
+            }
+            else if (subscriptionState.Contains("terminated"))
+            {
+                // Attended transfer: disconnect when subscription terminated
+                _sipLogger.LogEvent("Attended transfer completed (NOTIFY terminated) — disconnecting");
+                DisconnectAfterTransfer();
             }
             else
             {

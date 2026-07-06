@@ -352,7 +352,7 @@
             <Border Style="{StaticResource CardBorder}" VerticalAlignment="Center"
                     HorizontalAlignment="Center" MinWidth="320" Margin="20">
                 <StackPanel>
-                    <TextBlock Text="Blind Transfer" FontSize="18" FontWeight="SemiBold"
+                    <TextBlock Text="Перевод вызова" FontSize="18" FontWeight="SemiBold"
                                Foreground="White" HorizontalAlignment="Center" Margin="0,0,0,16"/>
                     <TextBlock Text="Номер абонента" Style="{StaticResource FieldLabel}"/>
                     <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}"
@@ -361,15 +361,18 @@
                     <Grid Margin="0,16,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Отмена"
                                 Command="{Binding CancelTransferCommand}"
                                 Style="{StaticResource GhostButton}"/>
-                        <Button Grid.Column="2" Content="Перевести"
+                        <Button Grid.Column="1" Content="Вслепую"
                                 Command="{Binding ExecuteTransferCommand}"
                                 Style="{StaticResource PrimaryButton}"/>
+                        <Button Grid.Column="2" Content="С ожиданием"
+                                Command="{Binding ExecuteAttendedTransferCommand}"
+                                Style="{StaticResource SuccessButton}"/>
                     </Grid>
                 </StackPanel>
             </Border>
