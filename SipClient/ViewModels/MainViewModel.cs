@@ -341,9 +341,9 @@ public partial class MainViewModel : ObservableObject
 
         if (result)
         {
-            StatusText = "Трансфер отправлен";
-            StatusBrush = "#4CAF50";
-            _notificationService.ShowNotification("Трансфер", $"REFER отправлен на {TransferNumber}", NotificationType.Success);
+            StatusText = "Ожидание завершения перевода...";
+            StatusBrush = "#FFC107";
+            _notificationService.ShowNotification("Трансфер", $"REFER отправлен на {TransferNumber}", NotificationType.Info);
         }
         else
         {
