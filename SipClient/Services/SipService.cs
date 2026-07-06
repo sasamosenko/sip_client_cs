@@ -1096,7 +1096,7 @@ public class SipService
 
             var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
 
-            if (_manualCallInProgress || _userAgent?.IsCallActive == true)
+            if (_manualCallInProgress)
             {
                 _sipLogger.LogEvent("Blind transfer NOTIFY received — disconnecting");
                 DisconnectAfterTransfer();
