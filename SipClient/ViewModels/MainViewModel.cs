@@ -195,6 +195,7 @@ public partial class MainViewModel : ObservableObject
         StatusBrush = "#FFC107";
 
         await _sipService.StartAsync(_config);
+        _transferService.Init(_sipService.GetTransport(), _config);
         await _sipService.RegisterAsync();
     }
 

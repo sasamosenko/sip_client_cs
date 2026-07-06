@@ -53,6 +53,8 @@ public class SipService
     /// </summary>
     public (SIPEndPoint? remoteEndPoint, string? callId, SIPFromHeader? fromHeader, SIPToHeader? toHeader, int cseq)? GetCallDialogInfo()
     {
+        _sipLogger.LogEvent($"GetCallDialogInfo: manual={_manualCallInProgress}, agentActive={_userAgent?.IsCallActive}, dialogue={_userAgent?.Dialogue != null}");
+
         if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
         {
             return (_outgoingRemoteEndPoint, _outgoingCallId, _outgoingFromHeader, _outgoingToHeader, _outgoingCSeq);
@@ -1036,6 +1038,8 @@ public class SipService
     public string GetLogPath() => _sipLogger.GetLogPath();
 
     public SipLogger GetSipLogger() => _sipLogger;
+
+    public SIPTransport? GetTransport() => _sipTransport;
 }
 
 public class AudioDeviceInfo
