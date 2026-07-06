@@ -1108,26 +1108,10 @@ public class SipService
             }
             else
             {
-                // Attended transfer: parse sipfrag to check result
+                // Attended transfer: do NOT disconnect on NOTIFY
+                // Just acknowledge and wait for BYE from Asterisk
                 var sipfragBody = sipRequest.Body ?? "";
-                bool transferSucceeded = sipfragBody.Contains("SIP/2.0 200 OK");
-
-                if (transferSucceeded && subscriptionState.Contains("terminated"))
-                {
-                    _sipLogger.LogEvent("Attended transfer succeeded — disconnecting");
-                    DisconnectAfterTransfer();
-                }
-                else if (!transferSucceeded && subscriptionState.Contains("terminated"))
-                {
-                    // Transfer failed — resume original call
-                    _sipLogger.LogEvent($"Attended transfer failed (sipfrag: {sipfragBody.Trim()}) — resuming call");
-                    _blindTransferPending = false;
-                    CallFailedWithReason?.Invoke(CurrentCallId ?? "", $"Трансфер отклонён: {sipfragBody.Trim()}");
-                }
-                else
-                {
-                    _sipLogger.LogEvent($"NOTIFY received (state: {subscriptionState}, sipfrag: {sipfragBody.Trim()}) — acknowledged");
-                }
+                _sipLogger.LogEvent($"Attended transfer NOTIFY (state: {subscriptionState}, sipfrag: {sipfragBody.Trim()}) — keeping call active, waiting for BYE");
             }
         }
 
