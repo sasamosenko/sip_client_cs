@@ -41,3 +41,15 @@ public class DirectionToIconConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+
+public class MuteColorConverter : IValueConverter
+{
+    private static readonly Color MutedColor = Color.FromRgb(244, 67, 54);     // Red
+    private static readonly Color NormalColor = Color.FromRgb(189, 189, 189); // Gray
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        => value is bool b && b ? MutedColor : NormalColor;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}
