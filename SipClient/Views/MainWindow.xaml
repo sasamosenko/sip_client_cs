@@ -358,21 +358,23 @@
                     <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource ModernTextBox}"
                              KeyDown="TransferNumber_KeyDown"/>
-                    <Grid Margin="0,16,0,0">
+                    <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="8"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="Отмена"
                                 Command="{Binding CancelTransferCommand}"
-                                Style="{StaticResource GhostButton}"/>
-                        <Button Grid.Column="1" Content="Вслепую"
+                                Style="{StaticResource GhostButton}" FontSize="12" Padding="10,6"/>
+                        <Button Grid.Column="2" Content="Вслепую"
                                 Command="{Binding ExecuteTransferCommand}"
-                                Style="{StaticResource PrimaryButton}"/>
-                        <Button Grid.Column="2" Content="С ожиданием"
+                                Style="{StaticResource PrimaryButton}" FontSize="12" Padding="10,6"/>
+                        <Button Grid.Column="4" Content="С ожиданием"
                                 Command="{Binding ExecuteAttendedTransferCommand}"
-                                Style="{StaticResource SuccessButton}"/>
+                                Style="{StaticResource SuccessButton}" FontSize="12" Padding="10,6"/>
                     </Grid>
                 </StackPanel>
             </Border>
