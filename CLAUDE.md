@@ -42,8 +42,8 @@
 |---|--------|-------|--------|
 | 1 | Регистрация | SipService.RegisterAsync | ✅ tested, locked |
 | 2 | Исходящий звонок | SipService.MakeCallAsync | ✅ tested, locked |
-| 3 | Входящий звонок | SipService.AnswerCall | 🔒 pending |
-| 4 | Завершение | SipService.HangupCall | 🔒 pending |
+| 3 | Входящий звонок | SipService.AnswerCall | ✅ tested, locked |
+| 4 | Завершение | SipService.HangupCall | ✅ tested, locked |
 | 5 | Трансфер | SipService.BlindTransferAsync | 🔒 pending |
 | 6 | Настройки | ConfigService, SettingsWindow | 🔒 pending |
 | 7 | История | CallHistoryService | 🔒 pending |

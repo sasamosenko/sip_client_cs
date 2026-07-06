@@ -974,6 +974,35 @@ public class SipService
                 }
             });
         }
+        else if (sipRequest.Method == SIPMethodsEnum.CANCEL)
+        {
+            _sipLogger.LogEvent("CANCEL received from remote");
+
+            // Send 200 OK for the CANCEL itself
+            var cancelOk = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
+            _ = _sipTransport!.SendResponseAsync(cancelOk);
+
+            // Send 487 Request Terminated for the original INVITE
+            var inviteTerminated = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.RequestTerminated, null);
+            _ = _sipTransport!.SendResponseAsync(inviteTerminated);
+
+            // Reject pending incoming call if any
+            if (_pendingIncomingCall != null)
+            {
+                _pendingIncomingCall.Reject(SIPResponseStatusCodesEnum.RequestTerminated, null, null);
+            }
+
+            if (!_callEndedFired)
+            {
+                _callEndedFired = true;
+                CleanupCall();
+                CallEnded?.Invoke();
+            }
+            else
+            {
+                CleanupCall();
+            }
+        }
         else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
         {
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
