@@ -482,72 +482,60 @@ public class SipService
 
     public async Task<bool> BlindTransferAsync(string destination)
     {
-        // Manual call path (outgoing calls via manual INVITE)
-        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
-        {
-            return await BlindTransferManualAsync(destination);
-        }
-
-        // SIPUserAgent path (incoming calls answered via SIPUserAgent)
-        if (_userAgent != null && _userAgent.IsCallActive)
-        {
-            try
-            {
-                if (!SIPURI.TryParse(destination, out var uri))
-                    uri = SIPURI.ParseSIPURIRelaxed($"{destination}@{_config.Server}");
-
-                _sipLogger.LogEvent($"Blind transfer (agent) to {destination}");
-                var result = await _userAgent.BlindTransfer(uri, TimeSpan.FromSeconds(10), CancellationToken.None);
-
-                if (result)
-                    _sipLogger.LogEvent("Transfer accepted by remote");
-                else
-                {
-                    _sipLogger.LogEvent("Transfer rejected by remote");
-                    ErrorOccurred?.Invoke("Трансфер отклонён");
-                }
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _sipLogger.LogError($"Transfer failed: {ex.Message}");
-                ErrorOccurred?.Invoke($"Ошибка трансфера: {ex.Message}");
-                return false;
-            }
-        }
-
-        ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
-        return false;
-    }
-
-    private async Task<bool> BlindTransferManualAsync(string destination)
-    {
-        if (_sipTransport == null || _outgoingRemoteEndPoint == null || _outgoingCallId == null)
+        if (_sipTransport == null)
         {
             ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
             return false;
         }
 
+        SIPEndPoint? remoteEP = null;
+        string? callId = null;
+        SIPFromHeader? fromHeader = null;
+        SIPToHeader? toHeader = null;
+
+        if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
+        {
+            remoteEP = _outgoingRemoteEndPoint;
+            callId = _outgoingCallId;
+            fromHeader = _outgoingFromHeader;
+            toHeader = _outgoingToHeader;
+        }
+        else if (_userAgent?.IsCallActive == true && _userAgent?.Dialogue != null)
+        {
+            var dialogue = _userAgent!.Dialogue!;
+            remoteEP = dialogue.RemoteSIPEndPoint;
+            callId = dialogue.CallId;
+            fromHeader = new SIPFromHeader(
+                dialogue.LocalUserField?.Name ?? _config.Username,
+                dialogue.LocalUserField?.URI ?? SIPURI.ParseSIPURIRelaxed($"sip:{_config.Username}@{_config.Server}"),
+                dialogue.LocalTag);
+            toHeader = new SIPToHeader(null, dialogue.RemoteTarget, dialogue.RemoteTag);
+        }
+        else
+        {
+            ErrorOccurred?.Invoke("Нет активного звонка для трансфера");
+            return false;
+        }
+
+        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!);
+    }
+
+    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader)
+    {
         try
         {
             var referTarget = $"sip:{destination}@{_config.Server}";
-
             var referRequest = SIPRequest.GetRequest(SIPMethodsEnum.REFER, SIPURI.ParseSIPURIRelaxed(referTarget));
 
-            // In-dialog headers
-            referRequest.Header.CallId = _outgoingCallId;
-            referRequest.Header.From = _outgoingFromHeader;
-            referRequest.Header.To = _outgoingToHeader;
+            referRequest.Header.CallId = callId;
+            referRequest.Header.From = fromHeader;
+            referRequest.Header.To = toHeader;
             referRequest.Header.CSeqMethod = SIPMethodsEnum.REFER;
             _outgoingCSeq += 2;
             referRequest.Header.CSeq = _outgoingCSeq;
-
-            // Refer-To header
             referRequest.Header.ReferTo = $"<{referTarget}>";
 
-            // Referred-By
-            var localPort = ((SIPUDPChannel)_sipTransport.GetSIPChannels().First()).Port;
+            var localPort = ((SIPUDPChannel)_sipTransport!.GetSIPChannels().First()).Port;
             referRequest.Header.ReferredBy = $"<sip:{_config.Username}@{localPort}>";
 
             var contactUri = SIPURI.ParseSIPURI($"sip:{_config.Username}@{localPort}");
@@ -560,12 +548,10 @@ public class SipService
             referRequest.Header.UserAgent = "SipClient/" + SipVersion.String;
             referRequest.Header.MaxForwards = 70;
 
-            _sipLogger.LogEvent($"Sending REFER to {_outgoingRemoteEndPoint} — Transfer to {destination}");
-            _ = _sipTransport.SendRequestAsync(_outgoingRemoteEndPoint, referRequest);
+            _sipLogger.LogEvent($"Sending REFER to {remoteEP} — Transfer to {destination} (Refer-To: {referTarget})");
+            _ = _sipTransport.SendRequestAsync(remoteEP, referRequest);
 
-            // Wait briefly for processing — actual 202 handling is async
             await Task.Delay(1000);
-            _sipLogger.LogEvent("Transfer REFER sent — awaiting response");
             return true;
         }
         catch (Exception ex)
