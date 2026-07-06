@@ -43,7 +43,6 @@ public class SipService
     private string? _remoteContactUri;
     private bool _outgoingCallAnswered;
     private SIPRequest? _outgoingInviteRequest;
-    private bool _blindTransferPending;
 
     public bool IsRegistered => _registrar != null;
     public bool IsInCall => _manualCallInProgress || _userAgent?.IsCallActive == true;
@@ -481,7 +480,7 @@ public class SipService
         }
     }
 
-    public async Task<bool> BlindTransferAsync(string destination, bool blind = true)
+    public async Task<bool> BlindTransferAsync(string destination)
     {
         if (_sipTransport == null)
         {
@@ -518,14 +517,13 @@ public class SipService
             return false;
         }
 
-        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!, blind);
+        return await SendReferAsync(destination, remoteEP!, callId!, fromHeader!, toHeader!);
     }
 
-    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader, bool blind)
+    private async Task<bool> SendReferAsync(string destination, SIPEndPoint remoteEP, string callId, SIPFromHeader fromHeader, SIPToHeader toHeader)
     {
         try
         {
-            _blindTransferPending = blind;
             var referTarget = $"sip:{destination}@{_config.Server}";
             var referRequest = SIPRequest.GetRequest(SIPMethodsEnum.REFER, SIPURI.ParseSIPURIRelaxed(referTarget));
 
@@ -724,8 +722,6 @@ public class SipService
 
     private void DisconnectAfterTransfer()
     {
-        _blindTransferPending = false;
-
         if (_manualCallInProgress && _outgoingRemoteEndPoint != null && _outgoingCallId != null)
         {
             SendByeForManualCall();
@@ -1100,18 +1096,14 @@ public class SipService
 
             var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
 
-            if (_blindTransferPending)
+            if (_manualCallInProgress)
             {
-                // Blind transfer: disconnect immediately on first NOTIFY after REFER
                 _sipLogger.LogEvent("Blind transfer NOTIFY received — disconnecting");
                 DisconnectAfterTransfer();
             }
             else
             {
-                // Attended transfer: do NOT disconnect on NOTIFY
-                // Just acknowledge and wait for BYE from Asterisk
-                var sipfragBody = sipRequest.Body ?? "";
-                _sipLogger.LogEvent($"Attended transfer NOTIFY (state: {subscriptionState}, sipfrag: {sipfragBody.Trim()}) — keeping call active, waiting for BYE");
+                _sipLogger.LogEvent($"NOTIFY received (state: {subscriptionState}) — acknowledged");
             }
         }
 

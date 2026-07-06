@@ -42,7 +42,6 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private double _micVolume = 100;
     [ObservableProperty] private double _speakerVolume = 100;
     [ObservableProperty] private string _transferNumber = "";
-    [ObservableProperty] private bool _transferModeBlind = true;
     [ObservableProperty] private int _localPort = 5080;
     [ObservableProperty] private int _rtpPortMin = 10000;
     [ObservableProperty] private int _rtpPortMax = 20000;
@@ -322,41 +321,16 @@ public partial class MainViewModel : ObservableObject
         if (string.IsNullOrEmpty(TransferNumber)) return;
 
         ShowTransferDialog = false;
-        var mode = TransferModeBlind ? "вслепую" : "с ожиданием";
-        StatusText = $"Трансфер ({mode}) на {TransferNumber}...";
+        StatusText = $"Трансфер на {TransferNumber}...";
         StatusBrush = "#FFC107";
 
-        var result = await _sipService.BlindTransferAsync(TransferNumber, TransferModeBlind);
+        var result = await _sipService.BlindTransferAsync(TransferNumber);
 
         if (result)
         {
             StatusText = "Трансфер выполнен";
             StatusBrush = "#4CAF50";
-            _notificationService.ShowNotification("Трансфер", $"Вызов переведён на {TransferNumber} ({mode})", NotificationType.Success);
-        }
-        else
-        {
-            StatusText = "Трансфер отклонён";
-            StatusBrush = "#FF5252";
-        }
-    }
-
-    [RelayCommand]
-    private async Task ExecuteAttendedTransferAsync()
-    {
-        if (string.IsNullOrEmpty(TransferNumber)) return;
-
-        ShowTransferDialog = false;
-        StatusText = $"Трансфер (с ожиданием) на {TransferNumber}...";
-        StatusBrush = "#FFC107";
-
-        var result = await _sipService.BlindTransferAsync(TransferNumber, false);
-
-        if (result)
-        {
-            StatusText = "Ожидание ответа на " + TransferNumber;
-            StatusBrush = "#FFC107";
-            _notificationService.ShowNotification("Трансфер", $"Ожидание ответа на {TransferNumber}...", NotificationType.Info);
+            _notificationService.ShowNotification("Трансфер", $"Вызов переведён на {TransferNumber}", NotificationType.Success);
         }
         else
         {
