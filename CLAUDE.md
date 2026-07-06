@@ -2,6 +2,12 @@
 
 ## Правила работы
 
+### 0. ГЛАВНОЕ ПРАВИЛО: НЕ ТРОГАЙ ЧТО РАБОТАЕТ!
+
+**Если модуль помечен как 🔒 LOCKED — НИКОГДА не изменяй его код!**
+Новые фичи делаются ТОЛЬКО в отдельных файлах/классах.
+Нарушение этого правила = потеря часов работы и доверия пользователя.
+
 ### 1. Восстановление работоспособности
 Приоритет — сделать приложение компилируемым и запускаемым. Каждое изменение должно проходить `dotnet build` без ошибок.
 
@@ -40,14 +46,14 @@
 
 | # | Модуль | Файлы | Статус |
 |---|--------|-------|--------|
-| 1 | Регистрация | SipService.RegisterAsync | ✅ tested, locked |
-| 2 | Исходящий звонок | SipService.MakeCallAsync | ✅ tested, locked |
-| 3 | Входящий звонок | SipService.AnswerCall | ✅ tested, locked |
-| 4 | Завершение | SipService.HangupCall | ✅ tested, locked |
-| 5 | Трансфер | SipService.BlindTransferAsync | 🔧 implemented, pending test |
+| 1 | Регистрация | SipService.RegisterAsync | 🔒 LOCKED |
+| 2 | Исходящий звонок | SipService.MakeCallAsync | 🔒 LOCKED |
+| 3 | Входящий звонок | SipService.AnswerCall | 🔒 LOCKED |
+| 4 | Завершение | SipService.HangupCall | 🔒 LOCKED |
+| 5 | Трансфер | TransferService.cs | 🔒 LOCKED |
 | 6 | Настройки | ConfigService, SettingsWindow | ⏭ skipped |
-| 7 | История | CallHistoryService | ✅ tested, locked |
-| 8 | Аудио | Volume, device selection | ✅ tested, locked |
+| 7 | История | CallHistoryService | 🔒 LOCKED |
+| 8 | Аудио | Volume, device selection | 🔒 LOCKED |
 
 ## SIPSorcery API (верифицировано)
 
