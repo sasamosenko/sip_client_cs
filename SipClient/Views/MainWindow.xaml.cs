@@ -56,6 +56,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TransferNumber_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is ViewModels.MainViewModel vm)
+        {
+            vm.ExecuteTransferCommand.Execute(null);
+        }
+    }
+
     private void CallHistory_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
