@@ -266,6 +266,7 @@ public partial class MainViewModel : ObservableObject
     private void ToggleMute()
     {
         IsMuted = !IsMuted;
+        _sipService?.SetMuted(IsMuted);
     }
 
     [RelayCommand]

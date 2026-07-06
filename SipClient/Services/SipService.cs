@@ -84,6 +84,23 @@ public class SipService
         }
     }
 
+    public void SetMuted(bool muted)
+    {
+        _sipLogger.LogEvent($"Microphone {(muted ? "muted" : "unmuted")}");
+        try
+        {
+            if (_rtpSession != null)
+            {
+                _rtpSession.SetMediaStreamStatus(SDPMediaTypesEnum.audio,
+                    muted ? MediaStreamStatusEnum.Inactive : MediaStreamStatusEnum.SendRecv);
+            }
+        }
+        catch (Exception ex)
+        {
+            _sipLogger.LogError($"Failed to set mute: {ex.Message}");
+        }
+    }
+
     public void SetLoggingEnabled(bool enabled)
     {
         _sipLogger.Enabled = enabled;
@@ -546,9 +563,9 @@ public class SipService
             _sipLogger.LogEvent($"Sending REFER to {_outgoingRemoteEndPoint} — Transfer to {destination}");
             _ = _sipTransport.SendRequestAsync(_outgoingRemoteEndPoint, referRequest);
 
-            // Wait for 202 Accepted
-            await Task.Delay(2000);
-            _sipLogger.LogEvent("Transfer REFER sent");
+            // Wait briefly for processing — actual 202 handling is async
+            await Task.Delay(1000);
+            _sipLogger.LogEvent("Transfer REFER sent — awaiting response");
             return true;
         }
         catch (Exception ex)
