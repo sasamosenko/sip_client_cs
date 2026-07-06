@@ -1016,12 +1016,12 @@ public class SipService
             var okResponse = SIPResponse.GetResponse(sipRequest, SIPResponseStatusCodesEnum.Ok, null);
             _ = _sipTransport!.SendResponseAsync(okResponse);
 
-            // Blind transfer completion: disconnect immediately
+            // Transfer complete — disconnect immediately
             var subscriptionState = sipRequest.Header.SubscriptionState ?? "";
             var sipfrag = sipRequest.Body ?? "";
             if (subscriptionState.Contains("terminated") && sipfrag.Contains("SIP/2.0 200 OK"))
             {
-                _sipLogger.LogEvent("Transfer complete (NOTIFY terminated + 200 OK) — disconnecting");
+                _sipLogger.LogEvent("Transfer complete — disconnecting");
                 if (_manualCallInProgress)
                 {
                     CleanupManualCall();
@@ -1030,11 +1030,8 @@ public class SipService
                 {
                     _userAgent.Hangup();
                 }
-                if (!_callEndedFired)
-                {
-                    _callEndedFired = true;
-                    CallEnded?.Invoke();
-                }
+                _callEndedFired = true;
+                CallEnded?.Invoke();
             }
         }
         else if (sipRequest.Method == SIPMethodsEnum.OPTIONS || sipRequest.Method == SIPMethodsEnum.REGISTER)
