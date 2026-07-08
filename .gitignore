@@ -2,6 +2,7 @@
 bin/
 obj/
 dist/
+dist.zip
 test_dumps/
 
 # IDE
@@ -24,6 +25,10 @@ config.json
 call_history.csv
 *.pcap
 dumps/
+
+# Temporary tools
+_ilspy_tmp/
+microsip.ini
 
 # MiMoCode
 .mimocode/

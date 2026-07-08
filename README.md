@@ -7,7 +7,6 @@
 - SIP регистрация на АТС (Digest auth)
 - Исходящие и входящие звонки
 - Blind transfer (REFER)
-- Replaces (attended transfer)
 - Автоответ с настраиваемой задержкой
 - Настройка кодеков (G.722, G.711 μ/A-law, G.729) с приоритетами
 - Выбор микрофона/динамика
@@ -21,7 +20,7 @@
 ## Требования
 
 - Windows 10+ (x64)
-- .NET 8 SDK (для сборки)
+- .NET 10 SDK (для сборки)
 
 ## Сборка
 
@@ -34,6 +33,26 @@ dotnet publish SipClient/SipClient.csproj -c Release -r win-x64 --self-contained
 1. Скачать `SipClient.exe` из [Releases](https://github.com/sasamosenko/sip_client_cs/releases)
 2. Создать `config.json` рядом (см. пример ниже)
 3. Запустить
+
+## CLI-параметры
+
+Приложение поддерживает запуск из командной строки:
+
+```bash
+# Регистрация + звонок
+SipClient.exe --server=asterisk.ss.local --username=testuser1 --password=pass1001 --call=1002
+
+# Только регистрация
+SipClient.exe --server=asterisk.ss.local --username=testuser1 --password=pass1001
+```
+
+| Параметр | Описание |
+|----------|----------|
+| `--server` | SIP-сервер (IP или домен) |
+| `--port` | Порт SIP (по умолчанию 5060) |
+| `--username` | SIP username |
+| `--password` | SIP пароль |
+| `--call` | Номер для автоматического вызова после регистрации |
 
 ## Конфигурация (config.json)
 
@@ -84,7 +103,7 @@ dotnet publish SipClient/SipClient.csproj -c Release -r win-x64 --self-contained
 ```
 SipClient/
 ├── Models/          — SipConfig, CallRecord, CodecOption
-├── Services/        — SipService, ConfigService, NotificationService, SipLogger
+├── Services/        — SipService, TransferService, ConfigService, NotificationService, SipLogger
 ├── ViewModels/      — MainViewModel (CommunityToolkit.Mvvm)
 ├── Views/           — MainWindow, SettingsWindow, AboutWindow
 ├── Converters/      — WPF value converters
@@ -94,7 +113,7 @@ SipClient/
 
 ## Стек
 
-- C# / .NET 8
+- C# / .NET 10
 - WPF (dark theme)
 - SIPSorcery 8.0.7 (SIP stack)
 - NAudio 2.2.1 (аудио)
