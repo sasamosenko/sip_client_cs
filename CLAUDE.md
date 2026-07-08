@@ -52,7 +52,7 @@
 | 4 | Завершение | SipService.HangupCall | 🔒 LOCKED |
 | 5 | Трансфер | TransferService.cs | 🔒 LOCKED |
 | 6 | Настройки | ConfigService, SettingsWindow | ⏭ skipped |
-| 7 | История | CallHistoryService | 🔒 LOCKED |
+| 7 | История звонков | CallHistoryService | 🔒 LOCKED |
 | 8 | Аудио | Volume, device selection | 🔒 LOCKED |
 
 ## SIPSorcery API (верифицировано)
@@ -81,3 +81,74 @@ SipClient.exe --server=asterisk.ss.local --username=testuser1 --password=pass100
 # Только регистрация (без звонка)
 SipClient.exe --server=asterisk.ss.local --username=testuser1 --password=pass1001
 ```
+
+---
+
+## История разработки
+
+| Дата | Этап | Описание |
+|------|------|----------|
+| 02.07.2026 | Основа | Создан проект: C# / .NET 8 + WPF + SIPSorcery. Регистрация, UI, тёмная тема, логирование |
+| 02.07.2026 | Звонки | Исходящие/входящие звонки, аудио (NAudio), громкость, выбор устройств |
+| 02.07.2026 | Настройки | SettingsWindow, config.json, кодеки с reorder, автоответ |
+| 02.07.2026 | История | CallHistoryService, отображение, CSV-экспорт |
+| 05.07.2026 | v1.0.0 | Первый релиз: все модули работают |
+| 06.07.2026 | Тестирование | Пошаговая проверка модулей 1-8 на реальном сервере. Digest auth, CANCEL handling |
+| 06.07.2026 | Трансфер | Blind transfer (REFER) — 20 коммитов отладки с Asterisk |
+| 06.07.2026 | Модернизация | Upgrade до .NET 10, рефакторинг TransferService |
+| 09.07.2026 | Очистка | Удаление temp-файлов, обновление документации |
+
+## Roadmap
+
+### Приоритет 1: Юнит-тесты (нет тестового проекта)
+
+Создать `SipClient.Tests.csproj` и покрыть ключевую логику:
+
+| Тест | Что покрывает | Файл |
+|------|---------------|------|
+| SipMessageBuilderTests | Формирование INVITE, BYE, REGISTER, REFER | SipService.cs |
+| SipParserTests | Парсинг SIP-ответов, заголовков, SDP | SipService.cs |
+| SipConfigTests | Загрузка/сохранение config.json, дефолты | ConfigService.cs |
+| CallRecordTests | Форматирование записи звонка, CSV | CallHistoryService.cs |
+| TransferServiceTests | Формирование REFER, Route-заголовки | TransferService.cs |
+
+### Приоритет 2: Исправление известных проблем
+
+| # | Проблема | Файл | Описание |
+|---|----------|------|----------|
+| 1 | CS8618 warning | TransferService.cs:21 | Поле `_config` не инициализировано в конструкторе |
+| 2 | CS8604 warnings | MainViewModel.cs:198,340 | Null-аргументы в TransferService методы |
+| 3 | CS0067 warning | TransferService.cs:19 | Событие `LogEvent` объявлено, но нигде не используется |
+| 4 | `--port` не реализован | App.xaml.cs | README описывает, но код не парсит |
+
+### Приоритет 3: Новые фичи
+
+| # | Фича | Сложность | Описание |
+|---|------|-----------|----------|
+| 1 | Attended transfer | Средняя | Replaces-based transfer (был удалён 06.07 — нужна стабильная реализация) |
+| 2 | Переход на сетевые настройки | Низкая | Реализовать парсинг `--port` в CLI |
+| 3 | Автопереподключение | Средняя | Re-registration при потере соединения с сервером |
+| 4 | Запись звонков | Высокая | Сохранение аудио в WAV/PCM файл |
+| 5 | Журнал SIP-сообщений | Низкая | Просмотр SENT/RECEIVED дампов в UI (сейчас только в файл) |
+| 6 | Контакты | Средняя | Адресная книга с быстрым набором |
+| 7 | DTMF (тональный набор) | Средняя | Отправка DTMF-событий через RTP (RFC 2833) |
+| 8 | SRTP (шифрование) | Высокая | Шифрование медиа-потока |
+
+### Приоритет 4: Качество
+
+| # | Задача | Описание |
+|---|--------|----------|
+| 1 | Сбор ошибок | Пользовательские сообщения об ошибках (не исключения) |
+| 2 | Логирование | Serilog или structured logging вместо `LogEvent` |
+| 3 | CI/CD | Расширить release.yml — добавить `dotnet test` перед сборкой |
+| 4 | Multi-platform | Оценить Avalonia UI для Linux/macOS |
+
+---
+
+## Текущее состояние (09.07.2026)
+
+- **Сборка:** `dotnet build` — 0 ошибок, 7 warnings (nullable + unused event)
+- **Модули:** 6/8 locked, 2/8 skipped (настройки, трансфер — трансфер снова locked после отладки)
+- **Тесты:** отсутствуют
+- **Версия:** 1.0.0
+- **Фреймворк:** .NET 10 (net10.0-windows10.0.17763)
